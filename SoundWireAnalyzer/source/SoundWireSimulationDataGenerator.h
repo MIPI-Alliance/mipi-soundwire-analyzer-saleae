@@ -18,6 +18,9 @@
 #ifndef SOUNDWIRE_SIMULATION_DATA_GENERATOR_H
 #define SOUNDWIRE_SIMULATION_DATA_GENERATOR_H
 
+#include <AnalyzerHelpers.h>
+#include "SoundWireProtocolDefs.h"
+
 class SoundWireAnalyzerSettings;
 
 class SoundWireSimulationDataGenerator
@@ -29,8 +32,23 @@ public:
     void Initialize( U32 simulation_sample_rate, SoundWireAnalyzerSettings* settings );
     U32 GenerateSimulationData( U64 newest_sample_requested, U32 sample_rate, SimulationChannelDescriptor** simulation_channel );
 
-protected:
+private:
+    void CreateFrame();
+
+private:
     SoundWireAnalyzerSettings* mSettings;
+    U32 mSimulationSampleRate;
+    SimulationChannelDescriptorGroup mSimulationChannels;
+    SimulationChannelDescriptor* mClock;
+    SimulationChannelDescriptor* mData;
+
+    ClockGenerator mClockGenerator;
+
+    int mDynamicSyncIndex;
+    unsigned int mRunningParity;
+    unsigned int mPingCount;
+    SdwOpCode mOpCode;
+    bool mDoneBusReset;
 };
 
 #endif //SOUNDWIRE_SIMULATION_DATA_GENERATOR_H

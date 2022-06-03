@@ -42,7 +42,6 @@ void SoundWireAnalyzer::WorkerThread()
 {
     mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
     mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
-
 }
 
 bool SoundWireAnalyzer::NeedsRerun()
@@ -54,7 +53,14 @@ U32 SoundWireAnalyzer::GenerateSimulationData(U64 minimum_sample_index,
                                               U32 device_sample_rate,
                                               SimulationChannelDescriptor** simulation_channels)
 {
-    return 0;
+    if (!mSimulationDataGenerator) {
+        mSimulationDataGenerator.reset(new SoundWireSimulationDataGenerator());
+        mSimulationDataGenerator->Initialize(GetSimulationSampleRate(), mSettings.get());
+    }
+
+    return mSimulationDataGenerator->GenerateSimulationData(minimum_sample_index,
+                                                            device_sample_rate,
+                                                            simulation_channels);
 }
 
 U32 SoundWireAnalyzer::GetMinimumSampleRateHz()
