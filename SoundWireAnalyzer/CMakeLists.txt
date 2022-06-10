@@ -18,6 +18,7 @@ source/SoundWireAnalyzerResults.h
 source/SoundWireSimulationDataGenerator.cpp
 source/SoundWireAnalyzer.h
 source/SoundWireAnalyzerSettings.cpp
+source/SoundWireProtocolDefs.h
 source/SoundWireSimulationDataGenerator.h
 source/SoundWireAnalyzerResults.cpp
 source/SoundWireAnalyzerSettings.h
