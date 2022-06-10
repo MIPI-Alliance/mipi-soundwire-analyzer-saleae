@@ -13,6 +13,8 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 include(ExternalAnalyzerSDK)
 
 set(SOURCES
+source/CBitstreamDecoder.h
+source/CBitstreamDecoder.cpp
 source/SoundWireAnalyzer.cpp
 source/SoundWireAnalyzerResults.h
 source/SoundWireSimulationDataGenerator.cpp
