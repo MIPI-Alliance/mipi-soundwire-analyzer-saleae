@@ -17,6 +17,7 @@
 #define SOUNDWIRE_ANALYZER_H
 
 #include <Analyzer.h>
+#include "CBitstreamDecoder.h"
 #include "SoundWireAnalyzerResults.h"
 #include "SoundWireSimulationDataGenerator.h"
 
@@ -45,6 +46,7 @@ private:
     AnalyzerChannelData* mSoundWireClock;
     AnalyzerChannelData* mSoundWireData;
 
+    std::unique_ptr<CBitstreamDecoder> mDecoder;
     std::unique_ptr<SoundWireSimulationDataGenerator> mSimulationDataGenerator;
 };
 

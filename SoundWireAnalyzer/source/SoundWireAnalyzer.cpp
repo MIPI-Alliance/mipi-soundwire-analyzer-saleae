@@ -15,6 +15,7 @@
 
 #include <AnalyzerChannelData.h>
 
+#include "CBitstreamDecoder.h"
 #include "SoundWireAnalyzer.h"
 #include "SoundWireAnalyzerSettings.h"
 
@@ -42,6 +43,24 @@ void SoundWireAnalyzer::WorkerThread()
 {
     mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
     mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
+
+    mDecoder.reset(new CBitstreamDecoder(mSoundWireClock, mSoundWireData));
+
+    // Advance one bit to get an initial data line state
+    mDecoder->NextBitValue();
+
+    for (;;) {
+        bool bitValue = mDecoder->NextBitValue();
+        U64 sampleNumber = mDecoder->CurrentSampleNumber();
+
+        mResults->AddMarker(sampleNumber,
+                            bitValue ? AnalyzerResults::One : AnalyzerResults::Zero,
+                            mSettings->mInputChannelData);
+
+        mResults->CommitResults();
+        ReportProgress(sampleNumber);
+        CheckIfThreadShouldExit();
+    }
 }
 
 bool SoundWireAnalyzer::NeedsRerun()
