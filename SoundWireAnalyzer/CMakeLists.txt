@@ -15,6 +15,8 @@ include(ExternalAnalyzerSDK)
 set(SOURCES
 source/CBitstreamDecoder.h
 source/CBitstreamDecoder.cpp
+source/CControlWordBuilder.h
+source/CControlWordBuilder.cpp
 source/CSyncFinder.h
 source/CSyncFinder.cpp
 source/SoundWireAnalyzer.cpp
