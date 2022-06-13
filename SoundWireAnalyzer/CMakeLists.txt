@@ -17,6 +17,8 @@ source/CBitstreamDecoder.h
 source/CBitstreamDecoder.cpp
 source/CControlWordBuilder.h
 source/CControlWordBuilder.cpp
+source/CFrameReader.h
+source/CFrameReader.cpp
 source/CSyncFinder.h
 source/CSyncFinder.cpp
 source/SoundWireAnalyzer.cpp
