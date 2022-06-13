@@ -13,9 +13,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iomanip>
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <sstream>
 #include <AnalyzerHelpers.h>
 
 #include "SoundWireAnalyzer.h"
@@ -34,10 +36,112 @@ SoundWireAnalyzerResults::~SoundWireAnalyzerResults()
 {
 }
 
+void SoundWireAnalyzerResults::generateClockBubble(U64 frame_index)
+{
+    Frame frame = GetFrame(frame_index);
+    CControlWordBuilder controlWord;
+    controlWord.SetValue(frame.mData1);
+
+    std::stringstream str;
+
+    // Put SSP at the start of the clock bubble so it's easy to see
+    if ((controlWord.OpCode() == kOpPing) && (controlWord.Ssp())) {
+        str << "SSP ";
+    }
+
+    if (frame.mFlags & kFlagParityBad) {
+        str << "Par: BAD ";
+    } else {
+        str << "Par: ok ";
+    }
+
+    // Dump raw hex of control word
+    str << std::setw(12) << std::setfill('0') << std::hex << frame.mData1;
+
+    AddResultString(str.str().c_str());
+}
+
+void SoundWireAnalyzerResults::generateDataBubble(U64 frame_index)
+{
+    Frame frame = GetFrame(frame_index);
+    CControlWordBuilder controlWord;
+    controlWord.SetValue(frame.mData1);
+    unsigned int pingStat;
+
+    std::stringstream str;
+
+    SdwOpCode opCode = controlWord.OpCode();
+    switch (opCode) {
+    case kOpPing:
+        str << "PING ";
+
+        // There are 12 status reports of 2 bits each
+        pingStat = controlWord.PeripheralStat();
+        str << std::hex;
+        for (int i = 0; i < 12; ++i) {
+            str << i << ":";
+            switch (pingStat & 3) {
+            case kStatNotPresent:
+                str << "- ";
+                break;
+            case kStatOk:
+                str << "Ok ";
+                break;
+            case kStatAlert:
+                str << "Al ";
+                break;
+            default:
+                str << "?? ";
+                break;
+            }
+            pingStat >>= 2;
+        }
+        break;
+    case kOpRead:
+    case kOpWrite:
+        if (opCode == kOpRead) {
+            str << "RD ";
+        } else {
+            str << "WR ";
+        }
+        str << "[" << controlWord.DeviceAddress() << "] @";
+        str << std::hex << controlWord.RegisterAddress() << "=" << controlWord.DataValue() << " ";
+        break;
+    default:
+        str << "OP?? ";
+        break;
+    }
+
+    if (controlWord.Nak()) {
+        str << "FAIL";
+    } else if (controlWord.Ack()) {
+        str << "OK";
+    } else if (opCode != kOpPing) {
+        // PING always reports Command_IGNORED state on success
+        str << "IGNORED";
+    }
+
+    if (controlWord.Preq()) {
+        if (str.str().back() != ' ') {
+            str << ' ';
+        }
+        str << "PREQ";
+    }
+
+    AddResultString(str.str().c_str());
+}
+
 void SoundWireAnalyzerResults::GenerateBubbleText(U64 frame_index,
                                                   Channel& channel,
                                                   DisplayBase display_base)
 {
+    ClearResultStrings();
+
+    if (channel == mSettings->mInputChannelClock) {
+        generateClockBubble(frame_index);
+    } else {
+        generateDataBubble(frame_index);
+    }
 }
 
 void SoundWireAnalyzerResults::GenerateExportFile(const char* file,

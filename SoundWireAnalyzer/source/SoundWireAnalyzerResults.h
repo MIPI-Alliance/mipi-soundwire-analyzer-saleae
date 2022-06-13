@@ -40,6 +40,10 @@ public:
     void GeneratePacketTabularText(U64 packet_id, DisplayBase display_base);
     void GenerateTransactionTabularText(U64 transaction_id, DisplayBase display_base);
 
+private:
+    void generateClockBubble(U64 frame_index);
+    void generateDataBubble(U64 frame_index);
+
 protected:
     SoundWireAnalyzerSettings* mSettings;
     SoundWireAnalyzer* mAnalyzer;
