@@ -16,6 +16,7 @@
 #include <AnalyzerChannelData.h>
 
 #include "CBitstreamDecoder.h"
+#include "CSyncFinder.h"
 #include "SoundWireAnalyzer.h"
 #include "SoundWireAnalyzerSettings.h"
 
@@ -49,7 +50,26 @@ void SoundWireAnalyzer::WorkerThread()
     // Advance one bit to get an initial data line state
     mDecoder->NextBitValue();
 
+    CSyncFinder syncFinder(*this, *mDecoder);
+    bool inSync = false;
+
+    // The sync finder will need to rewind so CBitStreamDecoder must be
+    // collecting history
+    mDecoder->CollectHistory(true);
+
     for (;;) {
+        if (!inSync) {
+          syncFinder.FindSync(mSettings->mNumRows, mSettings->mNumCols);
+
+          inSync = true;
+          mResults->AddMarker(mDecoder->CurrentSampleNumber(),
+                              AnalyzerResults::Stop,
+                              mSettings->mInputChannelClock);
+
+          // Now we have a good frame we don't need any history before this point
+          mDecoder->DiscardHistoryBeforeCurrentPosition();
+        }
+
         bool bitValue = mDecoder->NextBitValue();
         U64 sampleNumber = mDecoder->CurrentSampleNumber();
 
