@@ -24,6 +24,10 @@ class SoundWireAnalyzerSettings;
 class SoundWireAnalyzerResults : public AnalyzerResults
 {
 public:
+    // Used in mFlags field of frame.
+    static const int kFlagParityBad = (1 << 0);
+
+public:
     SoundWireAnalyzerResults(SoundWireAnalyzer* analyzer, SoundWireAnalyzerSettings* settings);
     virtual ~SoundWireAnalyzerResults();
 

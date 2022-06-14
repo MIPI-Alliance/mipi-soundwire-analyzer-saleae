@@ -16,9 +16,11 @@
 #include <AnalyzerChannelData.h>
 
 #include "CBitstreamDecoder.h"
+#include "CFrameReader.h"
 #include "CSyncFinder.h"
 #include "SoundWireAnalyzer.h"
 #include "SoundWireAnalyzerSettings.h"
+#include "SoundWireAnalyzerResults.h"
 
 SoundWireAnalyzer::SoundWireAnalyzer()
   :     Analyzer2(),
@@ -51,7 +53,11 @@ void SoundWireAnalyzer::WorkerThread()
     mDecoder->NextBitValue();
 
     CSyncFinder syncFinder(*this, *mDecoder);
+    CFrameReader frameReader;
     bool inSync = false;
+    bool isFirstFrame = true;
+    bool actualParityIsOdd;
+    Frame f;
 
     // The sync finder will need to rewind so CBitStreamDecoder must be
     // collecting history
@@ -59,15 +65,14 @@ void SoundWireAnalyzer::WorkerThread()
 
     for (;;) {
         if (!inSync) {
-          syncFinder.FindSync(mSettings->mNumRows, mSettings->mNumCols);
+            syncFinder.FindSync(mSettings->mNumRows, mSettings->mNumCols);
+            inSync = true;
+            isFirstFrame = true;
+            frameReader.Reset();
+            frameReader.SetShape(mSettings->mNumRows, mSettings->mNumCols);
 
-          inSync = true;
-          mResults->AddMarker(mDecoder->CurrentSampleNumber(),
-                              AnalyzerResults::Stop,
-                              mSettings->mInputChannelClock);
-
-          // Now we have a good frame we don't need any history before this point
-          mDecoder->DiscardHistoryBeforeCurrentPosition();
+            // Now we have a good frame we don't need any history before this point
+            mDecoder->DiscardHistoryBeforeCurrentPosition();
         }
 
         bool bitValue = mDecoder->NextBitValue();
@@ -76,6 +81,46 @@ void SoundWireAnalyzer::WorkerThread()
         mResults->AddMarker(sampleNumber,
                             bitValue ? AnalyzerResults::One : AnalyzerResults::Zero,
                             mSettings->mInputChannelData);
+
+        switch (frameReader.PushBit(bitValue)) {
+        case CFrameReader::eFrameStart:
+            f.mStartingSampleInclusive = sampleNumber;
+
+            // Mark start of frame with a green dot on the clock
+            mResults->AddMarker(sampleNumber,
+                                AnalyzerResults::Start,
+                                mSettings->mInputChannelClock);
+            break;
+        case CFrameReader::eNeedMoreBits:
+            break;
+        case CFrameReader::eCaptureParity:
+            actualParityIsOdd = mDecoder->IsParityOdd();
+            mDecoder->ResetParity();
+            break;
+        case CFrameReader::eFrameComplete:
+            f.mEndingSampleInclusive = sampleNumber;
+            f.mData1 = frameReader.ControlWord().Value();
+            f.mType = 0;
+            f.mFlags = 0;
+
+            // We can't calculate parity for the first frame because parity
+            // includes the end of the previous frame.
+            if (actualParityIsOdd != frameReader.ControlWord().Par()) {
+                if (!isFirstFrame) {
+                    f.mFlags |= SoundWireAnalyzerResults::kFlagParityBad;
+                }
+            }
+
+            mResults->AddFrame(f);
+            frameReader.Reset();
+            isFirstFrame = false;
+
+            // Now we've decoded this frame the history bits can be discarded
+            // save memory. History collection must remain enabled in case we
+            // lose sync on the next frame and have to rewind it.
+            mDecoder->DiscardHistoryBeforeCurrentPosition();
+            break;
+        }
 
         mResults->CommitResults();
         ReportProgress(sampleNumber);

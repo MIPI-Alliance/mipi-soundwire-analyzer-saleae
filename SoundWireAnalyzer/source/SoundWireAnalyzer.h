@@ -18,6 +18,7 @@
 
 #include <Analyzer.h>
 #include "CBitstreamDecoder.h"
+#include "CFrameReader.h"
 #include "SoundWireAnalyzerResults.h"
 #include "SoundWireSimulationDataGenerator.h"
 
