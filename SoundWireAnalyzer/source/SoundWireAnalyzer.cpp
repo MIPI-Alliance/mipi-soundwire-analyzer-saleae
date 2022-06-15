@@ -27,6 +27,7 @@ SoundWireAnalyzer::SoundWireAnalyzer()
         mSettings(new SoundWireAnalyzerSettings())
 {
     SetAnalyzerSettings(mSettings.get());
+    UseFrameV2();
 }
 
 SoundWireAnalyzer::~SoundWireAnalyzer()
@@ -42,12 +43,129 @@ void SoundWireAnalyzer::SetupResults()
     mResults->AddChannelBubblesWillAppearOn(mSettings->mInputChannelData);
 }
 
+void SoundWireAnalyzer::addFrameV2TableHeader()
+{
+    // The Saleae API doesn't provide a way to declare a column header, it
+    // appears to have its own method of picking a column order.
+    // Add a dummy entry at sample 0 to fix a column order
+    FrameV2 f;
+
+    // We are mainly interested in read and write so put those columns first
+    f.AddString("DevId", "");
+    f.AddString("Reg",  "");
+    f.AddString("Data",  "");
+
+    // SSP is infrequent but important
+    f.AddString("SSP", "");
+
+    // ACK, NAK and Preq are short and apply to all frames to put those next
+    f.AddString("ACK", "");
+    f.AddString("NAK", "");
+    f.AddString("Preq", "");
+
+    f.AddString("Par", "");
+
+    // Slave status is only useful in PING messages so put those last
+    for (int i = 0; i < 12; ++i) {
+        char slvStatTitle[4];
+        snprintf(slvStatTitle, sizeof(slvStatTitle), "P%d", i);
+        f.AddString(slvStatTitle, "");
+    }
+
+    // Place on sample 0
+    mResults->AddFrameV2(f, "dummy", 0, 0);
+}
+
+void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1)
+{
+    FrameV2 f;
+    const char* type = "??";
+    U8 addrArray[2];
+    unsigned int addr;
+    unsigned int pingStat;
+    char statTitle[4];
+
+    SdwOpCode opCode = controlWord.OpCode();
+    switch (opCode) {
+    case kOpPing:
+        type = "PING";
+
+        f.AddBoolean("SSP", controlWord.Ssp());
+
+        // There are 12 status reports of 2 bits each
+        pingStat = controlWord.PeripheralStat();
+        for (int i = 0; i < 12; ++i) {
+            snprintf(statTitle, sizeof(statTitle), "P%d", i);
+            switch (pingStat & 3) {
+            case kStatNotPresent:
+                f.AddString(statTitle, "");
+                break;
+            case kStatOk:
+                f.AddString(statTitle, "Ok");
+                break;
+            case kStatAlert:
+                f.AddString(statTitle, "AL");
+                break;
+            default:
+                f.AddString(statTitle, "??");
+                break;
+            }
+            pingStat >>= 2;
+        }
+        break;
+    case kOpRead:
+    case kOpWrite:
+        type = (opCode == kOpRead) ? "READ" : "WRITE";
+        f.AddByte("DevId", controlWord.DeviceAddress());
+
+        // Saleae say AddByteArray() is preferred to AddInteger()
+        addr = controlWord.RegisterAddress();
+        addrArray[0] = addr >> 8;
+        addrArray[1] = addr & 0xFF;
+        f.AddByteArray("Reg",  addrArray, sizeof(addrArray));
+        f.AddByte("Data",  controlWord.DataValue());
+        break;
+    default:
+        break;
+    }
+
+    f.AddBoolean("ACK", controlWord.Ack());
+    f.AddBoolean("NAK", controlWord.Nak());
+    f.AddBoolean("Preq", controlWord.Preq());
+
+    if (fv1.mFlags & SoundWireAnalyzerResults::kFlagParityBad) {
+        f.AddString("Par", "BAD");
+    } else {
+        f.AddString("Par", "Ok");
+    }
+
+    // The UI has a default column of "value" so use this for the raw word value
+    U8 wordArray[(kCtrlWordLastRow + 1) / 8];
+    U64 wordValue = controlWord.Value();
+    for (int i = sizeof(wordArray) - 1; i >= 0; --i) {
+        wordArray[i] = wordValue & 0xFF;
+        wordValue >>= 8;
+    }
+    f.AddByteArray("value", wordArray, sizeof(wordArray));
+
+    U64 startSample = fv1.mStartingSampleInclusive;
+    if (startSample == 0) {
+        // Don't overlap the dummy column header frame
+        startSample = 1;
+    }
+    mResults->AddFrameV2(f, type, startSample, fv1.mEndingSampleInclusive);
+}
+
+
 void SoundWireAnalyzer::WorkerThread()
 {
     mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
     mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
 
     mDecoder.reset(new CBitstreamDecoder(mSoundWireClock, mSoundWireData));
+
+    // Set columns for table view
+    addFrameV2TableHeader();
 
     // Advance one bit to get an initial data line state
     mDecoder->NextBitValue();
@@ -112,6 +230,9 @@ void SoundWireAnalyzer::WorkerThread()
             }
 
             mResults->AddFrame(f);
+
+            addFrameV2(frameReader.ControlWord(), f);
+
             frameReader.Reset();
             isFirstFrame = false;
 

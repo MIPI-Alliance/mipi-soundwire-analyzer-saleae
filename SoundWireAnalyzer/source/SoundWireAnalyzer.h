@@ -42,6 +42,10 @@ public:
     bool NeedsRerun();
 
 private:
+    void addFrameV2TableHeader();
+    void addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1);
+
+private:
     std::unique_ptr<SoundWireAnalyzerSettings> mSettings;
     std::unique_ptr<SoundWireAnalyzerResults> mResults;
     AnalyzerChannelData* mSoundWireClock;
