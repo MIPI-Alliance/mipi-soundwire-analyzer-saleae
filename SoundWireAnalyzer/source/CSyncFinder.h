@@ -28,8 +28,13 @@ public:
     void FindSync(int rows, int columns);
 
 private:
+    int checkSync();
+
+private:
     SoundWireAnalyzer& mAnalyzer;
     CBitstreamDecoder& mBitstream;
+    int mRows;
+    int mColumns;
 };
 
 #endif // CSYNCFINDER_H
