@@ -23,6 +23,12 @@
 class SoundWireAnalyzerSettings : public AnalyzerSettings
 {
 public:
+    enum {
+        eExportCsv,
+        eExportText
+    };
+
+public:
     SoundWireAnalyzerSettings();
     virtual ~SoundWireAnalyzerSettings();
 

@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <array>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -144,10 +145,145 @@ void SoundWireAnalyzerResults::GenerateBubbleText(U64 frame_index,
     }
 }
 
-void SoundWireAnalyzerResults::GenerateExportFile(const char* file,
+static const int kNumExportColumns = 22;
+static const char* const kColumnTitles[] = {
+    "Time(s)", "Control Word", "Op", "SSP", "DevId", "Reg", "Data",
+    "ACK", "NAK", "PREQ", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
+    "P8", "P9", "P10", "P11"
+};
+
+static const int kColumnWidths[kNumExportColumns] = {
+//  "Time(s)", "Control Word", "Op", "SSP", "DevId", "Reg", "Data",
+    17,        14,             5,    3,     5,       6,     4,
+//  "ACK", "NAK", "PREQ", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
+    3,     3,     4,      2,    2,    2,    2,    2,    2,    2,    2,
+//  "P8", "P9", "P10", "P11"
+    2,    2,    2,     2
+};
+
+void SoundWireAnalyzerResults::GenerateExportFile(const char* fileName,
                                                   DisplayBase display_base,
                                                   U32 export_type_user_id)
 {
+    char delimiter;
+    bool fixedWidth = false;
+
+    // As of Logic 2.3.55 the export_type_user_id is not passed into
+    // this function so we have to figure it out from the file extension.
+    std::string fname(fileName);
+    fname = fname.substr(fname.find_last_of('.'), std::string::npos);
+    if (fname == ".csv") {
+        delimiter = ',';
+    } else if (fname == ".txt") {
+        delimiter = ' ';
+        fixedWidth = true;
+    } else {
+        return;
+    }
+
+    std::ofstream stream(fileName, std::ios::out);
+
+    if (fixedWidth) {
+        stream << std::left;    // align left
+    }
+
+    for (int i = 0; i < kNumExportColumns; ++i) {
+        if (fixedWidth) {
+            stream << std::setw(kColumnWidths[i]);
+        }
+        stream << kColumnTitles[i];
+        if (i < kNumExportColumns - 1) {
+             stream << delimiter;
+        }
+    }
+
+    stream << std::endl;
+
+    U64 triggerSample = mAnalyzer->GetTriggerSample();
+    U32 sampleRate = mAnalyzer->GetSampleRate();
+    U64 numFrames = GetNumFrames();
+    for(U64 i = 0; i < numFrames; ++i) {
+        std::vector<std::string> strings;
+        unsigned int pingStat;
+
+        const Frame frame = GetFrame(i);
+        CControlWordBuilder controlWord;
+        controlWord.SetValue(frame.mData1);
+
+        char time[18];
+        AnalyzerHelpers::GetTimeString(frame.mStartingSampleInclusive, triggerSample, sampleRate, time, sizeof(time));
+        strings.push_back(time);
+
+        // Control word value
+        std::ostringstream ss;
+        ss << "0x" << std::hex << std::setw(12) << std::setfill('0') << controlWord.Value();
+        strings.push_back(ss.str());
+
+        // OpCode specific fields
+        const SdwOpCode opCode = controlWord.OpCode();
+        switch (opCode) {
+        case kOpPing:
+            strings.push_back("PING");
+            strings.push_back(std::to_string(controlWord.Ssp()));
+
+            // Skip DevId, Reg and Data
+            strings.push_back("");
+            strings.push_back("");
+            strings.push_back("");
+
+            break;
+        case kOpRead:
+        case kOpWrite:
+            if (opCode == kOpRead) {
+                strings.push_back("READ");
+            } else {
+                strings.push_back("WRITE");
+            }
+
+            // Skip SSP
+            strings.push_back("");
+
+            ss.str("");
+            ss << std::dec << controlWord.DeviceAddress();
+            strings.push_back(ss.str());
+
+            ss.str("");
+            ss << "0x" << std::hex << std::setw(4) << std::setfill('0') << controlWord.RegisterAddress();
+            strings.push_back(ss.str());
+
+            ss.str("");
+            ss << "0x" << std::setw(2) << controlWord.DataValue();
+            strings.push_back(ss.str());
+            break;
+        }
+
+        // ACK, NAK and PREQ
+        strings.push_back(std::to_string(controlWord.Ack()));
+        strings.push_back(std::to_string(controlWord.Nak()));
+        strings.push_back(std::to_string(controlWord.Preq()));
+
+        if (opCode == kOpPing) {
+            // Fill in status
+            pingStat = controlWord.PeripheralStat();
+            for (int i = 0; i < 12; ++i) {
+                strings.push_back(std::to_string(pingStat & 3));
+                pingStat >>= 2;
+            }
+        }
+
+        stream << std::setfill(' ') << std::left;
+        int colNum = 0;
+        for (auto it: strings) {
+            if (fixedWidth) {
+                stream << std::setw(kColumnWidths[colNum++]);
+            }
+
+            stream << it << delimiter;
+        }
+        stream << std::endl;
+    }
+
+    stream.close();
 }
 
 void SoundWireAnalyzerResults::GenerateFrameTabularText(U64 frame_index,

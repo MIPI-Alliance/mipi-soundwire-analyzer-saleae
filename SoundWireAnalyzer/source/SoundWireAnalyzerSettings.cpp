@@ -51,6 +51,12 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
     ClearChannels();
     AddChannel(mInputChannelClock, "SoundWire Clock", false);
     AddChannel(mInputChannelData,  "SoundWire Data", false);
+
+    // As of Logic 2.3.55 the UI ignores this and has a hardcoded
+    // option to export to text/csv
+    AddExportOption(0, "Export as text/csv file" );
+    AddExportExtension(eExportCsv, "csv", "csv" );
+    AddExportExtension(eExportText, "text", "txt" );
 }
 
 SoundWireAnalyzerSettings::~SoundWireAnalyzerSettings()
