@@ -77,6 +77,15 @@ public:
                     PeekField(kPingStat0_3Row, kPingStat0_3NumRows);
         }
 
+    inline bool IsPingSameAs(const CControlWordBuilder& other) const
+        {
+            return (PeripheralStat() == other.PeripheralStat()) &&
+                    (Ssp() == other.Ssp()) &&
+                    (Preq() == other.Preq()) &&
+                    (Ack() == other.Ack()) &&
+                    (Nak() == other.Nak());
+        }
+
     // Read/Write words
     inline unsigned int DeviceAddress() const
         { return PeekField(kDevAddrRow, kDevAddrNumRows); }

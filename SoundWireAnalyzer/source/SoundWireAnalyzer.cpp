@@ -161,6 +161,7 @@ void SoundWireAnalyzer::WorkerThread()
 {
     mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
     mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
+    const bool suppressDuplicatePings = mSettings->mSuppressDuplicatePings;
 
     mDecoder.reset(new CBitstreamDecoder(mSoundWireClock, mSoundWireData));
 
@@ -172,6 +173,7 @@ void SoundWireAnalyzer::WorkerThread()
 
     CSyncFinder syncFinder(*this, *mDecoder);
     CFrameReader frameReader;
+    CControlWordBuilder lastPing;
     bool inSync = false;
     bool isFirstFrame = true;
     bool actualParityIsOdd;
@@ -231,7 +233,16 @@ void SoundWireAnalyzer::WorkerThread()
 
             mResults->AddFrame(f);
 
-            addFrameV2(frameReader.ControlWord(), f);
+            if (suppressDuplicatePings &&
+                (frameReader.ControlWord().OpCode() == kOpPing)) {
+                    if (isFirstFrame ||
+                        !frameReader.ControlWord().IsPingSameAs(lastPing)) {
+                        addFrameV2(frameReader.ControlWord(), f);
+                    }
+                lastPing.SetValue(frameReader.ControlWord().Value());
+            } else {
+                addFrameV2(frameReader.ControlWord(), f);
+            }
 
             frameReader.Reset();
             isFirstFrame = false;

@@ -42,12 +42,14 @@ public:
 
     unsigned int mNumRows;
     unsigned int mNumCols;
+    bool mSuppressDuplicatePings;
 
 protected:
     std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceClock;
     std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceData;
     std::unique_ptr<AnalyzerSettingInterfaceInteger> mRowInterface;
     std::unique_ptr<AnalyzerSettingInterfaceInteger> mColInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceBool> mSuppressDuplicatePingsInterface;
 };
 
 #endif //SOUNDWIRE_ANALYZER_SETTINGS_H

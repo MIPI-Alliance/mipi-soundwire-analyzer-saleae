@@ -21,7 +21,8 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
   :     mInputChannelClock(UNDEFINED_CHANNEL),
         mInputChannelData(UNDEFINED_CHANNEL),
         mNumRows(48),
-        mNumCols(2)
+        mNumCols(2),
+        mSuppressDuplicatePings(false)
 {
     mInputChannelInterfaceClock.reset( new AnalyzerSettingInterfaceChannel() );
     mInputChannelInterfaceClock->SetTitleAndTooltip("SoundWire Clock", "SoundWire Clock");
@@ -43,10 +44,15 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
     mColInterface->SetMin(2);
     mColInterface->SetInteger(mNumCols);
 
+    mSuppressDuplicatePingsInterface.reset(new AnalyzerSettingInterfaceBool());
+    mSuppressDuplicatePingsInterface->SetCheckBoxText("Suppress duplicate pings in table");
+    mSuppressDuplicatePingsInterface->SetValue(mSuppressDuplicatePings);
+
     AddInterface(mInputChannelInterfaceClock.get());
     AddInterface(mInputChannelInterfaceData.get());
     AddInterface(mRowInterface.get());
     AddInterface(mColInterface.get());
+    AddInterface(mSuppressDuplicatePingsInterface.get());
 
     ClearChannels();
     AddChannel(mInputChannelClock, "SoundWire Clock", false);
@@ -69,6 +75,7 @@ bool SoundWireAnalyzerSettings::SetSettingsFromInterfaces()
     mInputChannelData  = mInputChannelInterfaceData->GetChannel();
     mNumRows = mRowInterface->GetInteger();
     mNumCols = mColInterface->GetInteger();
+    mSuppressDuplicatePings = mSuppressDuplicatePingsInterface->GetValue();
 
     ClearChannels();
     AddChannel(mInputChannelClock, "SoundWire Clock", true);
@@ -84,6 +91,7 @@ void SoundWireAnalyzerSettings::UpdateInterfacesFromSettings()
 
     mRowInterface->SetInteger(mNumRows);
     mColInterface->SetInteger(mNumCols);
+    mSuppressDuplicatePingsInterface->SetValue(mSuppressDuplicatePings);
 }
 
 void SoundWireAnalyzerSettings::LoadSettings(const char* settings)
@@ -96,6 +104,7 @@ void SoundWireAnalyzerSettings::LoadSettings(const char* settings)
         text_archive >> mInputChannelData;
         text_archive >> mNumRows;
         text_archive >> mNumCols;
+        text_archive >> mSuppressDuplicatePings;
 
         ClearChannels();
         AddChannel(mInputChannelClock, "SoundWire Clock", true);
@@ -114,6 +123,7 @@ const char* SoundWireAnalyzerSettings::SaveSettings()
     text_archive << mInputChannelData;
     text_archive << mNumRows;
     text_archive << mNumCols;
+    text_archive << mSuppressDuplicatePings;
 
     return SetReturnString(text_archive.GetString());
 }
