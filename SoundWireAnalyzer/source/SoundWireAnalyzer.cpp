@@ -16,6 +16,7 @@
 #include <AnalyzerChannelData.h>
 
 #include "CBitstreamDecoder.h"
+#include "CDynamicSyncGenerator.h"
 #include "CFrameReader.h"
 #include "CSyncFinder.h"
 #include "SoundWireAnalyzer.h"
@@ -171,9 +172,11 @@ void SoundWireAnalyzer::WorkerThread()
     // Advance one bit to get an initial data line state
     mDecoder->NextBitValue();
 
+    CBitstreamDecoder::CMark startMark = mDecoder->Mark();
     CSyncFinder syncFinder(*this, *mDecoder);
     CFrameReader frameReader;
     CControlWordBuilder lastPing;
+    CDynamicSyncGenerator dynamicSync;
     bool inSync = false;
     bool isFirstFrame = true;
     bool actualParityIsOdd;
@@ -185,6 +188,8 @@ void SoundWireAnalyzer::WorkerThread()
 
     for (;;) {
         if (!inSync) {
+            mDecoder->SetToMark(startMark);
+
             // Try to find sync at default frame shape
             syncFinder.FindSync(mSettings->mNumRows, mSettings->mNumCols);
             inSync = true;
@@ -199,6 +204,8 @@ void SoundWireAnalyzer::WorkerThread()
         bool bitValue = mDecoder->NextBitValue();
         U64 sampleNumber = mDecoder->CurrentSampleNumber();
 
+        // TODO: If we lost sync we will revisit some bits but must not add the
+        // marker again
         mResults->AddMarker(sampleNumber,
                             bitValue ? AnalyzerResults::One : AnalyzerResults::Zero,
                             mSettings->mInputChannelData);
@@ -208,6 +215,8 @@ void SoundWireAnalyzer::WorkerThread()
             f.mStartingSampleInclusive = sampleNumber;
 
             // Mark start of frame with a green dot on the clock
+            // TODO: If we lost sync we will revisit some bits but must not
+            // add the marker again
             mResults->AddMarker(sampleNumber,
                                 AnalyzerResults::Start,
                                 mSettings->mInputChannelClock);
@@ -224,11 +233,24 @@ void SoundWireAnalyzer::WorkerThread()
             f.mType = 0;
             f.mFlags = 0;
 
-            // We can't calculate parity for the first frame because parity
-            // includes the end of the previous frame.
-            if (actualParityIsOdd != frameReader.ControlWord().Par()) {
-                if (!isFirstFrame) {
-                    f.mFlags |= SoundWireAnalyzerResults::kFlagParityBad;
+            // Seed dynamic sequence from value in first frame
+            if (isFirstFrame) {
+                dynamicSync.SetValue(frameReader.ControlWord().DynamicSync());
+            } else {
+                // Check whether we've lost sync. Don't consider parity in this
+                // because that would make it more difficult to analyze bus
+                // corruption.
+                if ((frameReader.ControlWord().StaticSync() != kStaticSyncVal) ||
+                    (frameReader.ControlWord().DynamicSync() != dynamicSync.Next())) {
+                    inSync = false;
+                    break;
+                }
+                // We can't calculate parity for the first frame because parity
+                // includes the end of the previous frame.
+                if (actualParityIsOdd != frameReader.ControlWord().Par()) {
+                    if (!isFirstFrame) {
+                        f.mFlags |= SoundWireAnalyzerResults::kFlagParityBad;
+                    }
                 }
             }
 
@@ -259,6 +281,9 @@ void SoundWireAnalyzer::WorkerThread()
             // save memory. History collection must remain enabled in case we
             // lose sync on the next frame and have to rewind it.
             mDecoder->DiscardHistoryBeforeCurrentPosition();
+
+            startMark = mDecoder->Mark();
+            ReportProgress(sampleNumber);
             break;
         }
 
