@@ -18,6 +18,7 @@
 #include <AnalyzerChannelData.h>
 
 #include "CBitstreamDecoder.h"
+#include "CDynamicSyncGenerator.h"
 #include "SoundWireProtocolDefs.h"
 
 // Reduce size of history buffer by storing the delta between sample numbers.
@@ -57,6 +58,11 @@ CBitstreamDecoder::CBitstreamDecoder(AnalyzerChannelData* clock,
       mNextHistoryReadIndex(std::numeric_limits<decltype(mNextHistoryReadIndex)>::max()),
       mCollectHistory(false)
 {
+    // The history can get quite large, typically needing 4096 bits for bus
+    // reset then 16 frames for the sync sequence. Reserve space to avoid
+    // a push_back() having to reallocate.
+    mHistory.reserve(kBusResetOnesCount +
+                     ((kMaxRows * kMaxColumns) * CDynamicSyncGenerator::kSequenceLengthFrames));
 }
 
 CBitstreamDecoder::~CBitstreamDecoder()
