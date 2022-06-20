@@ -27,6 +27,12 @@ public:
 
     void FindSync(int rows, int columns);
 
+    inline int Rows() const
+        { return mRows; }
+
+    inline int Columns() const
+        { return mColumns; }
+
 private:
     int checkSync();
 

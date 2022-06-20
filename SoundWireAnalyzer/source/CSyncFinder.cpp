@@ -111,6 +111,12 @@ int CSyncFinder::checkSync()
     CDynamicSyncGenerator dynamicSync;
     dynamicSync.SetValue(frame.ControlWord().DynamicSync());
 
+    // Has frame shape changed?
+    if (frame.ControlWord().IsFrameShapeChange()) {
+        frame.ControlWord().GetNewShape(mRows, mColumns);
+        frame.SetShape(mRows, mColumns);
+    }
+
     int framesOk = 1; // include the seed frame
 
     // Try to match the remaining frames in a sync sequence
@@ -135,6 +141,12 @@ int CSyncFinder::checkSync()
             return framesOk;
         }
         ++framesOk;
+
+        // Has frame shape changed?
+        if (frame.ControlWord().IsFrameShapeChange()) {
+            frame.ControlWord().GetNewShape(mRows, mColumns);
+            frame.SetShape(mRows, mColumns);
+        }
     }
 
     mBitstream.SetToMark(startMark);
@@ -146,9 +158,6 @@ int CSyncFinder::checkSync()
 // complete frame.
 void CSyncFinder::FindSync(int rows, int columns)
 {
-    mRows = rows;
-    mColumns = columns;
-
     unsigned int lastStaticSyncBitOffset = BitOffsetInFrame(columns, kLastStaticSyncRow, 0);
     CStaticSyncMatcher matcher;
     matcher.Reset(columns);
@@ -172,6 +181,8 @@ void CSyncFinder::FindSync(int rows, int columns)
             mBitstream.SkipBits(TotalBitsInFrame(rows, columns) - lastStaticSyncBitOffset);
         }
 
+        mRows = rows;
+        mColumns = columns;
         int framesOk = checkSync();
 
         // Don't demand a complete sync sequence. We could be capturing a small

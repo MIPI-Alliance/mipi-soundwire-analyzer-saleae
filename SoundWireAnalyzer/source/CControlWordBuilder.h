@@ -96,6 +96,17 @@ public:
     inline unsigned int DataValue() const
         { return PeekField(kRegDataRow, kRegDataNumRows); }
 
+    inline bool IsFrameShapeChange() const
+        {
+            if (OpCode() != kOpWrite) {
+                return false;
+            }
+            unsigned int addr = RegisterAddress();
+            return (addr == kRegAddrScpFrameCtrl0) || (addr == kRegAddrScpFrameCtrl1);
+        }
+
+    void GetNewShape(int& rows, int& columns) const;
+
 private:
     U64 mWord;
     U64 mNextPushBitMask;

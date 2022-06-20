@@ -185,11 +185,12 @@ void SoundWireAnalyzer::WorkerThread()
 
     for (;;) {
         if (!inSync) {
+            // Try to find sync at default frame shape
             syncFinder.FindSync(mSettings->mNumRows, mSettings->mNumCols);
             inSync = true;
             isFirstFrame = true;
             frameReader.Reset();
-            frameReader.SetShape(mSettings->mNumRows, mSettings->mNumCols);
+            frameReader.SetShape(syncFinder.Rows(), syncFinder.Columns());
 
             // Now we have a good frame we don't need any history before this point
             mDecoder->DiscardHistoryBeforeCurrentPosition();
@@ -242,6 +243,13 @@ void SoundWireAnalyzer::WorkerThread()
                 lastPing.SetValue(frameReader.ControlWord().Value());
             } else {
                 addFrameV2(frameReader.ControlWord(), f);
+            }
+
+            // Has frame shape changed?
+            if (frameReader.ControlWord().IsFrameShapeChange()) {
+                int rows, cols;
+                frameReader.ControlWord().GetNewShape(rows, cols);
+                frameReader.SetShape(rows, cols);
             }
 
             frameReader.Reset();

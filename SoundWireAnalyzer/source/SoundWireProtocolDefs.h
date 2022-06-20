@@ -71,6 +71,10 @@ static const unsigned int kStaticSyncVal = 0xb1;
 // Number of consecutive logic ones to signal a bus reset
 static const unsigned int kBusResetOnesCount = 4096;
 
+// Registers we are interested in
+const U16 kRegAddrScpFrameCtrl0 = 0x60;
+const U16 kRegAddrScpFrameCtrl1 = 0x70;
+
 // Size of frame in bits
 static inline int TotalBitsInFrame(int rows, int columns)
         { return rows * columns; }
