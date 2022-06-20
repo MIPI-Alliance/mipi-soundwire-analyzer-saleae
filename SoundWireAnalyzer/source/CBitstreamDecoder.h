@@ -67,6 +67,8 @@ public:
 
 private:
     void invalidateHistoryReadIndex();
+    void appendBitToHistory(enum BitState level, U64 sampleDelta);
+    enum BitState nextBitFromHistory(U64& sampleDelta);
 
 private:
     friend class CMark;
@@ -80,10 +82,7 @@ private:
     size_t mNextHistoryReadIndex;
     bool mCollectHistory;
 
-    // vector<bool> is packed into bits so vector<char> might be faster because
-    // it avoids all the bit shifting and masking.
-    std::vector<char> mHistoryDataLevel;
-    std::vector<U64> mHistorySampleNumber;
+    std::vector<U16> mHistory;
 };
 
 #endif // CBITSTREAMDECODER_H

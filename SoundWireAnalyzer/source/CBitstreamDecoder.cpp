@@ -20,6 +20,23 @@
 #include "CBitstreamDecoder.h"
 #include "SoundWireProtocolDefs.h"
 
+// Reduce size of history buffer by storing the delta between sample numbers.
+// SWIRE_CLK is typically >1MHz so at 500MS/s the sample number delta between
+// bits is usually <250. However we could stray into a gap in the clock so
+// larger deltas are stored by adding extra entries with an "overflow" flag
+// indicating that more bits must be accumulated from the next entry.
+// Each history entry is 16 bits with 14 bits of sample delta, 1 bit for the
+// overflow flag and 1 bit for the data line value.
+// As an initial sequence would be 4096 bits for bus reset then 16 frames for
+// the sync sequence, the worst case is around 69632 bits of history, so at
+// 2 bytes per entry this is a considerable memory saving over at least 9 bytes
+// per entry (u64 sample number plus at least 1 byte data value), and also
+// improves cache locality.
+static const int kHistoryDeltaFragmentBits      = 14;
+static const unsigned int kHistoryDeltaMask     = 0x3fff;
+static const unsigned int kHistoryDeltaOverflow = 0x4000;
+static const unsigned int kHistoryBitHighFlag   = 0x8000;
+
 CBitstreamDecoder::CMark::CMark(const CBitstreamDecoder& decoder, size_t nextHistoryReadIndex)
     : mLastDataLevel(decoder.mLastDataLevel),
       mContiguousOnesCount(decoder.mContiguousOnesCount),
@@ -51,6 +68,49 @@ inline void CBitstreamDecoder::invalidateHistoryReadIndex()
     mNextHistoryReadIndex = std::numeric_limits<decltype(mNextHistoryReadIndex)>::max();
 }
 
+void CBitstreamDecoder::appendBitToHistory(enum BitState level, U64 sampleDelta)
+{
+    U16 dataLevelFlag = 0;
+    if (level == BIT_HIGH) {
+        dataLevelFlag |= kHistoryBitHighFlag;
+    }
+
+    if (sampleDelta <= kHistoryDeltaMask) {
+        // Quick handling of most common case
+        mHistory.push_back(dataLevelFlag | static_cast<U16>(sampleDelta));
+        return;
+    }
+
+    do {
+        mHistory.push_back(dataLevelFlag |
+                           ((sampleDelta > kHistoryDeltaMask) ? kHistoryDeltaOverflow : 0) |
+                           static_cast<U16>(sampleDelta) & kHistoryDeltaMask);
+        sampleDelta >>= kHistoryDeltaFragmentBits;
+    } while (sampleDelta);
+}
+
+enum BitState CBitstreamDecoder::nextBitFromHistory(U64& sampleDelta)
+{
+    U16 val = mHistory[mNextHistoryReadIndex++];
+    enum BitState state = (val & kHistoryBitHighFlag) ? BIT_HIGH : BIT_LOW;
+    U64 delta = val & kHistoryDeltaMask;
+
+    if (val & kHistoryDeltaOverflow) {
+        for (int i = kHistoryDeltaFragmentBits; val & kHistoryDeltaOverflow; i += kHistoryDeltaFragmentBits) {
+            val = mHistory[mNextHistoryReadIndex++];
+            delta |= static_cast<U64>(val & kHistoryDeltaMask) << i;
+        }
+    }
+
+    if (mNextHistoryReadIndex == mHistory.size()) {
+        // Prevent it becoming a valid index if more data is added to history
+        invalidateHistoryReadIndex();
+    }
+
+    sampleDelta = delta;
+    return state;
+}
+
 // Advance mClock and mData to the next clock edge and return the
 // decoded bit state.
 bool CBitstreamDecoder::NextBitValue()
@@ -61,24 +121,21 @@ bool CBitstreamDecoder::NextBitValue()
     // but the Saleae APIs can only go forward. If data has been rewound to
     // a mark fetch the data from the history buffer until we reach
     // the end of the buffer.
-    if (mNextHistoryReadIndex < mHistorySampleNumber.size()) {
-        level = static_cast<BitState>(mHistoryDataLevel[mNextHistoryReadIndex]);
-        mCurrentSampleNumber = mHistorySampleNumber[mNextHistoryReadIndex];
-        ++mNextHistoryReadIndex;
-        if (mNextHistoryReadIndex == mHistorySampleNumber.size()) {
-            // Prevent it becoming a valid index if more data is added to history
-            invalidateHistoryReadIndex();
-        }
+    if (mNextHistoryReadIndex < mHistory.size()) {
+        U64 delta;
+        level = nextBitFromHistory(delta);
+        mCurrentSampleNumber += delta;
     } else {
         mClock->AdvanceToNextEdge();
-        mCurrentSampleNumber = mClock->GetSampleNumber();
-        mData->AdvanceToAbsPosition(mCurrentSampleNumber);
+        U64 sampleNum = mClock->GetSampleNumber();
+        mData->AdvanceToAbsPosition(sampleNum);
         level = mData->GetBitState();
 
         if (mCollectHistory) {
-            mHistoryDataLevel.push_back(static_cast<char>(level));
-            mHistorySampleNumber.push_back(mCurrentSampleNumber);
+            appendBitToHistory(level, sampleNum - mCurrentSampleNumber);
         }
+
+        mCurrentSampleNumber = sampleNum;
     }
 
     // NRZ signals a 1 by a change of level, 0 by no change.
@@ -129,17 +186,14 @@ void CBitstreamDecoder::CollectHistory(bool enable)
 // WARNING: This invalidates all CMarks!!
 void CBitstreamDecoder::DiscardHistoryBeforeCurrentPosition()
 {
-    if (mHistorySampleNumber.size() == 0) {
+    if (mHistory.size() == 0) {
         return;
     }
 
     // Discarding the front of a vector is expensive so only discard if
     // the entire buffer is obsolete.
-    if (mNextHistoryReadIndex >= mHistorySampleNumber.size()) {
-        // Current position is past history: discard all history
-        mHistorySampleNumber.clear();
-        mHistoryDataLevel.clear();
-        return;
+    if (mNextHistoryReadIndex >= mHistory.size()) {
+        mHistory.clear();
     }
 }
 
@@ -154,8 +208,8 @@ CBitstreamDecoder::CMark CBitstreamDecoder::Mark() const
     // when we retore the mark either it will point to a bit that is now
     // saved in history, or if no more bits are read it will still point
     // beyond the end of history.
-    if (nextHistoryReadIndex >= mHistorySampleNumber.size()) {
-        nextHistoryReadIndex = mHistorySampleNumber.size();
+    if (nextHistoryReadIndex >= mHistory.size()) {
+        nextHistoryReadIndex = mHistory.size();
     }
 
     return CMark(*this, nextHistoryReadIndex);
@@ -174,7 +228,7 @@ void CBitstreamDecoder::SetToMark(const CMark& mark)
     // still (correctly) point beyond history. Invalidate it so that adding
     // to history now won't cause nextHistoryReadIndex to become within
     // the range of history.
-    if (mNextHistoryReadIndex >= mHistorySampleNumber.size()) {
+    if (mNextHistoryReadIndex >= mHistory.size()) {
        invalidateHistoryReadIndex();
     }
 
