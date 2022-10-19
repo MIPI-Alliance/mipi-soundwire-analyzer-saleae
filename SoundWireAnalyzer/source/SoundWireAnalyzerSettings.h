@@ -30,6 +30,18 @@ public:
     void UpdateInterfacesFromSettings();
     void LoadSettings(const char* settings);
     const char* SaveSettings();
+
+    Channel mInputChannelClock;
+    Channel mInputChannelData;
+
+    unsigned int mNumRows;
+    unsigned int mNumCols;
+
+protected:
+    std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceClock;
+    std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceData;
+    std::unique_ptr<AnalyzerSettingInterfaceInteger> mRowInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceInteger> mColInterface;
 };
 
 #endif //SOUNDWIRE_ANALYZER_SETTINGS_H
