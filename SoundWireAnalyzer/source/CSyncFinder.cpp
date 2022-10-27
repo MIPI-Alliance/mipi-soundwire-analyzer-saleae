@@ -178,12 +178,7 @@ void CSyncFinder::FindSync(int rows, int columns)
         mRows = rows;
         mColumns = columns;
         int framesOk = checkSync();
-
-        // Don't demand a complete sync sequence. We could be capturing a small
-        // fragment of bus activity that does not contain enough complete frames.
-        // At least two consecutive frames must look ok.
-        // TODO: See if another static sync sequence gives a better match.
-        if (framesOk > 1) {
+        if (framesOk > 15) {
             return;
         }
 
