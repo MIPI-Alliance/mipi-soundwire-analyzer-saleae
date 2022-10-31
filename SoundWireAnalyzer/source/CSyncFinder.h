@@ -16,6 +16,7 @@
 #ifndef CSYNCFINDER_H
 #define CSYNCFINDER_H
 
+#include <vector>
 #include "LogicPublicTypes.h"
 #include "CBitstreamDecoder.h"
 #include "SoundWireAnalyzer.h"
@@ -34,13 +35,17 @@ public:
         { return mColumns; }
 
 private:
-    int checkSync();
+    int checkSync(int rows, int columns);
+    bool testIfSyncIsReal(const std::vector<int>* rowsList, int columns,
+                          U64 matchedBitOffset, const CBitstreamDecoder::CMark& searchStartMark);
 
 private:
     SoundWireAnalyzer& mAnalyzer;
     CBitstreamDecoder& mBitstream;
     int mRows;
     int mColumns;
+    std::vector<int> mSingleRowList;
+    std::vector<int> mSingleColumnList;
 };
 
 #endif // CSYNCFINDER_H

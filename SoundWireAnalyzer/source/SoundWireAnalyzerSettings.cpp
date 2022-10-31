@@ -37,6 +37,7 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
 
     mRowInterface.reset(new AnalyzerSettingInterfaceNumberList());
     mRowInterface->SetTitleAndTooltip("Num Rows",  "Specify number of rows.");
+    mRowInterface->AddNumber(0, "Auto", "Auto detect number of rows");
     auto sortedRows = kFrameShapeRows;
     std::sort(sortedRows.begin(), sortedRows.end());
     for (const auto it : sortedRows) {
@@ -46,9 +47,12 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
 
         mRowInterface->AddNumber(it, std::to_string(it).c_str(), "");
     }
+    // Default to auto-detection
+    mRowInterface->SetNumber(0);
 
     mColInterface.reset(new AnalyzerSettingInterfaceNumberList());
     mColInterface->SetTitleAndTooltip("Num Cols",  "Specify number of columns.");
+    mColInterface->AddNumber(0, "Auto", "Auto detect number of columns");
     auto sortedCols = kFrameShapeColumns;
     std::sort(sortedCols.begin(), sortedCols.end());
     for (const auto it : sortedCols) {
@@ -58,6 +62,8 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
 
         mColInterface->AddNumber(it, std::to_string(it).c_str(), "");
     }
+    // Default to auto-detection
+    mColInterface->SetNumber(0);
 
     mSuppressDuplicatePingsInterface.reset(new AnalyzerSettingInterfaceBool());
     mSuppressDuplicatePingsInterface->SetCheckBoxText("Suppress duplicate pings in table");
