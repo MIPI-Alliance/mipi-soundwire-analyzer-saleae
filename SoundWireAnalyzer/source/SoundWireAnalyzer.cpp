@@ -13,6 +13,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+#include <sstream>
 #include <AnalyzerChannelData.h>
 
 #include "CBitstreamDecoder.h"
@@ -75,6 +77,15 @@ void SoundWireAnalyzer::addFrameV2TableHeader()
 
     // Place on sample 0
     mResults->AddFrameV2(f, "dummy", 0, 0);
+}
+
+void SoundWireAnalyzer::addFrameShapeMessage(U64 sampleNumber, int rows, int columns)
+{
+    FrameV2 f;
+    std::stringstream s;
+
+    s << rows << " x " << columns;
+    mResults->AddFrameV2(f, s.str().c_str(), sampleNumber, sampleNumber);
 }
 
 void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1)
@@ -196,6 +207,8 @@ void SoundWireAnalyzer::WorkerThread()
             isFirstFrame = true;
             frameReader.Reset();
             frameReader.SetShape(syncFinder.Rows(), syncFinder.Columns());
+            addFrameShapeMessage(mDecoder->CurrentSampleNumber(),
+                                 syncFinder.Rows(), syncFinder.Columns());
 
             // Now we have a good frame we don't need any history before this point
             mDecoder->DiscardHistoryBeforeCurrentPosition();
@@ -272,6 +285,7 @@ void SoundWireAnalyzer::WorkerThread()
                 int rows, cols;
                 frameReader.ControlWord().GetNewShape(rows, cols);
                 frameReader.SetShape(rows, cols);
+                addFrameShapeMessage(sampleNumber, rows, cols);
             }
 
             frameReader.Reset();
