@@ -13,9 +13,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
+#include <string>
 #include <AnalyzerHelpers.h>
 
 #include "SoundWireAnalyzerSettings.h"
+#include "SoundWireProtocolDefs.h"
 
 SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
   :     mInputChannelClock(UNDEFINED_CHANNEL),
@@ -32,17 +35,29 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
     mInputChannelInterfaceData->SetTitleAndTooltip("SoundWire Data", "SoundWire Data");
     mInputChannelInterfaceData->SetChannel(mInputChannelData);
 
-    mRowInterface.reset(new AnalyzerSettingInterfaceInteger());
+    mRowInterface.reset(new AnalyzerSettingInterfaceNumberList());
     mRowInterface->SetTitleAndTooltip("Num Rows",  "Specify number of rows.");
-    mRowInterface->SetMax(256);
-    mRowInterface->SetMin(48);
-    mRowInterface->SetInteger(mNumRows);
+    auto sortedRows = kFrameShapeRows;
+    std::sort(sortedRows.begin(), sortedRows.end());
+    for (const auto it : sortedRows) {
+        if (it == 0) {
+            continue;
+        }
 
-    mColInterface.reset(new AnalyzerSettingInterfaceInteger());
+        mRowInterface->AddNumber(it, std::to_string(it).c_str(), "");
+    }
+
+    mColInterface.reset(new AnalyzerSettingInterfaceNumberList());
     mColInterface->SetTitleAndTooltip("Num Cols",  "Specify number of columns.");
-    mColInterface->SetMax(16);
-    mColInterface->SetMin(2);
-    mColInterface->SetInteger(mNumCols);
+    auto sortedCols = kFrameShapeColumns;
+    std::sort(sortedCols.begin(), sortedCols.end());
+    for (const auto it : sortedCols) {
+        if (it == 0) {
+            continue;
+        }
+
+        mColInterface->AddNumber(it, std::to_string(it).c_str(), "");
+    }
 
     mSuppressDuplicatePingsInterface.reset(new AnalyzerSettingInterfaceBool());
     mSuppressDuplicatePingsInterface->SetCheckBoxText("Suppress duplicate pings in table");
@@ -73,8 +88,8 @@ bool SoundWireAnalyzerSettings::SetSettingsFromInterfaces()
 {
     mInputChannelClock = mInputChannelInterfaceClock->GetChannel();
     mInputChannelData  = mInputChannelInterfaceData->GetChannel();
-    mNumRows = mRowInterface->GetInteger();
-    mNumCols = mColInterface->GetInteger();
+    mNumRows = static_cast<unsigned int>(mRowInterface->GetNumber());
+    mNumCols = static_cast<unsigned int>(mColInterface->GetNumber());
     mSuppressDuplicatePings = mSuppressDuplicatePingsInterface->GetValue();
 
     ClearChannels();
@@ -89,8 +104,8 @@ void SoundWireAnalyzerSettings::UpdateInterfacesFromSettings()
     mInputChannelInterfaceClock->SetChannel(mInputChannelClock);
     mInputChannelInterfaceData->SetChannel(mInputChannelData);
 
-    mRowInterface->SetInteger(mNumRows);
-    mColInterface->SetInteger(mNumCols);
+    mRowInterface->SetNumber(mNumRows);
+    mColInterface->SetNumber(mNumCols);
     mSuppressDuplicatePingsInterface->SetValue(mSuppressDuplicatePings);
 }
 

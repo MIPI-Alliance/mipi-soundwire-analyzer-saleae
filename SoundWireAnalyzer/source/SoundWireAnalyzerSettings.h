@@ -47,8 +47,8 @@ public:
 protected:
     std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceClock;
     std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceData;
-    std::unique_ptr<AnalyzerSettingInterfaceInteger> mRowInterface;
-    std::unique_ptr<AnalyzerSettingInterfaceInteger> mColInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceNumberList> mRowInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceNumberList> mColInterface;
     std::unique_ptr<AnalyzerSettingInterfaceBool> mSuppressDuplicatePingsInterface;
 };
 
