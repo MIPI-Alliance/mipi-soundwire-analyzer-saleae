@@ -16,6 +16,8 @@
 #ifndef SOUNDWIRE_PROTOCOL_DEFS_H
 #define SOUNDWIRE_PROTOCOL_DEFS_H
 
+#include <vector>
+
 static const int kMaxRows                = 256;
 static const int kMaxColumns             = 16;
 
@@ -65,6 +67,7 @@ enum SdwPingStat {
     kStatOk         = 1,
     kStatAlert      = 2,
 };
+
 // Static sync value in reconstructed order (first row is MSB)
 static const unsigned int kStaticSyncVal = 0xb1;
 
@@ -74,6 +77,12 @@ static const unsigned int kBusResetOnesCount = 4096;
 // Registers we are interested in
 const U16 kRegAddrScpFrameCtrl0 = 0x60;
 const U16 kRegAddrScpFrameCtrl1 = 0x70;
+
+// Array of possible rows count indexed by enumeration in ScpFrameCtrl register
+extern const std::vector<int> kFrameShapeRows;
+
+// Array of possible columns count indexed by enumeration in ScpFrameCtrl register
+extern const std::vector<int> kFrameShapeColumns;
 
 // Size of frame in bits
 static inline int TotalBitsInFrame(int rows, int columns)

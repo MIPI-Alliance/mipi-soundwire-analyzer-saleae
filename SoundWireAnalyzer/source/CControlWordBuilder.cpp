@@ -49,14 +49,19 @@ void CControlWordBuilder::SkipBits(int numBits)
 
 void CControlWordBuilder::GetNewShape(int& rows, int& columns) const
 {
-    static const int rowsConv[] = {
-        48, 50, 60, 64, 75, 80, 125, 147, 96, 100, 120, 128, 150, 169, 250, 0,
-        192, 200, 240, 256, 72, 144, 90, 180, 0, 0, 0, 0, 0, 0, 0, 0
-    };
-    static const U8 columnsConv[] = {
-        2, 4, 6, 8, 10, 12, 14, 16
-    };
     unsigned int data = DataValue();
-    rows = rowsConv[data >> 3];
-    columns = columnsConv[data & 7];
+    unsigned int rowsIndex = data >> 3;
+    unsigned int columnsIndex = data & 7;
+
+    if (rowsIndex < kFrameShapeRows.size()) {
+        rows = kFrameShapeRows[rowsIndex];
+    } else {
+        rows = 0;
+    }
+
+    if (columnsIndex < kFrameShapeColumns.size()) {
+        columns = kFrameShapeColumns[columnsIndex];
+    } else {
+        columns = 0;
+    }
 }

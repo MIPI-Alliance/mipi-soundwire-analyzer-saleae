@@ -33,6 +33,7 @@ source/SoundWireSimulationDataGenerator.h
 source/SoundWireAnalyzerResults.cpp
 source/SoundWireAnalyzerSettings.h
 source/SoundWireProtocolDefs.h
+source/SoundWireProtocolDefs.cpp
 )
 
 add_analyzer_plugin(${PROJECT_NAME} SOURCES ${SOURCES})
