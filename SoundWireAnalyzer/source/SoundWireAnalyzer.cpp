@@ -84,7 +84,7 @@ void SoundWireAnalyzer::addFrameShapeMessage(U64 sampleNumber, int rows, int col
     FrameV2 f;
     std::stringstream s;
 
-    s << rows << " x " << columns;
+    s << "shape " << rows << " x " << columns;
     mResults->AddFrameV2(f, s.str().c_str(), sampleNumber, sampleNumber);
 }
 
