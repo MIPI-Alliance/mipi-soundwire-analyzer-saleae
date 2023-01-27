@@ -67,6 +67,7 @@ void SoundWireAnalyzer::addFrameV2TableHeader()
     f.AddString("Preq", "");
 
     f.AddString("Par", "");
+    f.AddString("Dsync", "");
 
     // Slave status is only useful in PING messages so put those last
     for (int i = 0; i < 12; ++i) {
@@ -141,6 +142,11 @@ void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const
         break;
     }
 
+    if (fv1.mFlags & SoundWireAnalyzerResults::kFlagSyncLoss) {
+        // Replace table entry type with sync loss marker
+        type = "SYNC LOST";
+    }
+
     f.AddBoolean("ACK", controlWord.Ack());
     f.AddBoolean("NAK", controlWord.Nak());
     f.AddBoolean("Preq", controlWord.Preq());
@@ -150,6 +156,9 @@ void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const
     } else {
         f.AddString("Par", "Ok");
     }
+
+    U8 dsyncByte = static_cast<U8>(controlWord.DynamicSync());
+    f.AddByteArray("Dsync", &dsyncByte, 1);
 
     // The UI has a default column of "value" so use this for the raw word value
     U8 wordArray[(kCtrlWordLastRow + 1) / 8];
@@ -167,7 +176,6 @@ void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const
     }
     mResults->AddFrameV2(f, type, startSample, fv1.mEndingSampleInclusive);
 }
-
 
 void SoundWireAnalyzer::WorkerThread()
 {
@@ -250,20 +258,23 @@ void SoundWireAnalyzer::WorkerThread()
             if (isFirstFrame) {
                 dynamicSync.SetValue(frameReader.ControlWord().DynamicSync());
             } else {
-                // Check whether we've lost sync. Don't consider parity in this
-                // because that would make it more difficult to analyze bus
-                // corruption.
-                if ((frameReader.ControlWord().StaticSync() != kStaticSyncVal) ||
-                    (frameReader.ControlWord().DynamicSync() != dynamicSync.Next())) {
-                    inSync = false;
-                    break;
-                }
                 // We can't calculate parity for the first frame because parity
                 // includes the end of the previous frame.
                 if (actualParityIsOdd != frameReader.ControlWord().Par()) {
                     if (!isFirstFrame) {
                         f.mFlags |= SoundWireAnalyzerResults::kFlagParityBad;
                     }
+                }
+
+                // Check whether we've lost sync. Don't consider parity in this
+                // because that would make it more difficult to analyze bus
+                // corruption.
+                if ((frameReader.ControlWord().StaticSync() != kStaticSyncVal) ||
+                    (frameReader.ControlWord().DynamicSync() != dynamicSync.Next())) {
+                    inSync = false;
+                    f.mFlags |= SoundWireAnalyzerResults::kFlagSyncLoss;
+                    addFrameV2(frameReader.ControlWord(), f);
+                    break;
                 }
             }
 

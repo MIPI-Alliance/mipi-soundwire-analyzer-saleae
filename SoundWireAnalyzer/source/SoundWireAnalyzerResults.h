@@ -26,6 +26,7 @@ class SoundWireAnalyzerResults : public AnalyzerResults
 public:
     // Used in mFlags field of frame.
     static const int kFlagParityBad = (1 << 0);
+    static const int kFlagSyncLoss = (1 << 1);
 
 public:
     SoundWireAnalyzerResults(SoundWireAnalyzer* analyzer, SoundWireAnalyzerSettings* settings);
