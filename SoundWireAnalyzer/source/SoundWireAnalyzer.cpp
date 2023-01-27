@@ -273,6 +273,7 @@ void SoundWireAnalyzer::WorkerThread()
                     (frameReader.ControlWord().DynamicSync() != dynamicSync.Next())) {
                     inSync = false;
                     f.mFlags |= SoundWireAnalyzerResults::kFlagSyncLoss;
+                    mResults->AddFrame(f);
                     addFrameV2(frameReader.ControlWord(), f);
                     break;
                 }

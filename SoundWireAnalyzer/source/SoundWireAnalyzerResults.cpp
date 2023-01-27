@@ -71,6 +71,11 @@ void SoundWireAnalyzerResults::generateDataBubble(U64 frame_index)
 
     std::stringstream str;
 
+    // If sync was lost just skip
+    if (frame.mFlags & SoundWireAnalyzerResults::kFlagSyncLoss) {
+        return;
+    }
+
     SdwOpCode opCode = controlWord.OpCode();
     switch (opCode) {
     case kOpPing:
@@ -145,18 +150,18 @@ void SoundWireAnalyzerResults::GenerateBubbleText(U64 frame_index,
     }
 }
 
-static const int kNumExportColumns = 22;
+static const int kNumExportColumns = 23;
 static const char* const kColumnTitles[] = {
     "Time(s)", "Control Word", "Op", "SSP", "DevId", "Reg", "Data",
-    "ACK", "NAK", "PREQ", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
+    "ACK", "NAK", "PREQ", "Dsync", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
     "P8", "P9", "P10", "P11"
 };
 
 static const int kColumnWidths[kNumExportColumns] = {
 //  "Time(s)", "Control Word", "Op", "SSP", "DevId", "Reg", "Data",
     17,        14,             5,    3,     5,       6,     4,
-//  "ACK", "NAK", "PREQ", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
-    3,     3,     4,      2,    2,    2,    2,    2,    2,    2,    2,
+//  "ACK", "NAK", "PREQ", "Dsync", "P0", "P1", "P2", "P3", "P4", "P5", "P6", "P7",
+    3,     3,     4,      2,       2,    2,    2,    2,    2,    2,    2,    2,
 //  "P8", "P9", "P10", "P11"
     2,    2,    2,     2
 };
@@ -209,6 +214,7 @@ void SoundWireAnalyzerResults::GenerateExportFile(const char* fileName,
         const Frame frame = GetFrame(i);
         CControlWordBuilder controlWord;
         controlWord.SetValue(frame.mData1);
+        bool syncLost = frame.mFlags & SoundWireAnalyzerResults::kFlagSyncLoss;
 
         char time[18];
         AnalyzerHelpers::GetTimeString(frame.mStartingSampleInclusive, triggerSample, sampleRate, time, sizeof(time));
@@ -219,11 +225,17 @@ void SoundWireAnalyzerResults::GenerateExportFile(const char* fileName,
         ss << "0x" << std::hex << std::setw(12) << std::setfill('0') << controlWord.Value();
         strings.push_back(ss.str());
 
+        if (syncLost) {
+            strings.push_back("SYNC LOST");
+        }
+
         // OpCode specific fields
         const SdwOpCode opCode = controlWord.OpCode();
         switch (opCode) {
         case kOpPing:
-            strings.push_back("PING");
+            if (!syncLost) {
+                strings.push_back("PING");
+            }
             strings.push_back(std::to_string(controlWord.Ssp()));
 
             // Skip DevId, Reg and Data
@@ -234,10 +246,12 @@ void SoundWireAnalyzerResults::GenerateExportFile(const char* fileName,
             break;
         case kOpRead:
         case kOpWrite:
-            if (opCode == kOpRead) {
-                strings.push_back("READ");
-            } else {
-                strings.push_back("WRITE");
+            if (!syncLost) {
+                if (opCode == kOpRead) {
+                    strings.push_back("READ");
+                } else {
+                    strings.push_back("WRITE");
+                }
             }
 
             // Skip SSP
@@ -261,6 +275,11 @@ void SoundWireAnalyzerResults::GenerateExportFile(const char* fileName,
         strings.push_back(std::to_string(controlWord.Ack()));
         strings.push_back(std::to_string(controlWord.Nak()));
         strings.push_back(std::to_string(controlWord.Preq()));
+
+        // Dsync
+        ss.str("");
+        ss << "0x" << std::setw(2) << controlWord.DynamicSync();
+        strings.push_back(ss.str());
 
         if (opCode == kOpPing) {
             // Fill in status
