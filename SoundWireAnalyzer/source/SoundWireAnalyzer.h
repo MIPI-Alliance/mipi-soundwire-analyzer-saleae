@@ -42,7 +42,6 @@ public:
     bool NeedsRerun();
 
 private:
-    void addFrameV2TableHeader();
     void addFrameShapeMessage(U64 sampleNumber, int rows, int columns);
     void addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1);
 

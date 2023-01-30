@@ -46,12 +46,16 @@ void SoundWireAnalyzer::SetupResults()
     mResults->AddChannelBubblesWillAppearOn(mSettings->mInputChannelData);
 }
 
-void SoundWireAnalyzer::addFrameV2TableHeader()
+void SoundWireAnalyzer::addFrameShapeMessage(U64 sampleNumber, int rows, int columns)
 {
     // The Saleae API doesn't provide a way to declare a column header, it
     // appears to have its own method of picking a column order.
-    // Add a dummy entry at sample 0 to fix a column order
+    // The frame shape will always be the first entry in the table so log
+    // something for every column to try to define the columns in a fixed order.
     FrameV2 f;
+    std::stringstream shapeType;
+
+    shapeType << "shape " << rows << " x " << columns;
 
     // We are mainly interested in read and write so put those columns first
     f.AddString("DevId", "");
@@ -61,7 +65,7 @@ void SoundWireAnalyzer::addFrameV2TableHeader()
     // SSP is infrequent but important
     f.AddString("SSP", "");
 
-    // ACK, NAK and Preq are short and apply to all frames to put those next
+    // ACK, NAK and Preq are short and apply to all frames so put those next
     f.AddString("ACK", "");
     f.AddString("NAK", "");
     f.AddString("Preq", "");
@@ -76,17 +80,7 @@ void SoundWireAnalyzer::addFrameV2TableHeader()
         f.AddString(slvStatTitle, "");
     }
 
-    // Place on sample 0
-    mResults->AddFrameV2(f, "dummy", 0, 0);
-}
-
-void SoundWireAnalyzer::addFrameShapeMessage(U64 sampleNumber, int rows, int columns)
-{
-    FrameV2 f;
-    std::stringstream s;
-
-    s << "shape " << rows << " x " << columns;
-    mResults->AddFrameV2(f, s.str().c_str(), sampleNumber, sampleNumber);
+    mResults->AddFrameV2(f, shapeType.str().c_str(), sampleNumber, sampleNumber);
 }
 
 void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1)
@@ -184,9 +178,6 @@ void SoundWireAnalyzer::WorkerThread()
     const bool suppressDuplicatePings = mSettings->mSuppressDuplicatePings;
 
     mDecoder.reset(new CBitstreamDecoder(mSoundWireClock, mSoundWireData));
-
-    // Set columns for table view
-    addFrameV2TableHeader();
 
     // Advance one bit to get an initial data line state
     mDecoder->NextBitValue();
