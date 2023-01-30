@@ -13,7 +13,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <limits>
 #include <LogicPublicTypes.h>
 #include <AnalyzerChannelData.h>
 
@@ -55,7 +54,7 @@ CBitstreamDecoder::CBitstreamDecoder(AnalyzerChannelData* clock,
       mContiguousOnesCount(0),
       mParityIsOdd(false),
       mLastDataLevel(data->GetBitState()),
-      mNextHistoryReadIndex(std::numeric_limits<decltype(mNextHistoryReadIndex)>::max()),
+      mNextHistoryReadIndex(kInvalidHistoryIndex),
       mCollectHistory(false)
 {
     // The history can get quite large, typically needing 4096 bits for bus
@@ -71,7 +70,7 @@ CBitstreamDecoder::~CBitstreamDecoder()
 
 inline void CBitstreamDecoder::invalidateHistoryReadIndex()
 {
-    mNextHistoryReadIndex = std::numeric_limits<decltype(mNextHistoryReadIndex)>::max();
+    mNextHistoryReadIndex = kInvalidHistoryIndex;
 }
 
 void CBitstreamDecoder::appendBitToHistory(enum BitState level, U64 sampleDelta)

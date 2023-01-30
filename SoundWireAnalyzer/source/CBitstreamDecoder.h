@@ -16,6 +16,7 @@
 #ifndef CBITSTREAMDECODER_H
 #define CBITSTREAMDECODER_H
 
+#include <limits>
 #include <vector>
 #include <AnalyzerChannelData.h>
 #include <LogicPublicTypes.h>
@@ -83,6 +84,8 @@ private:
     bool mCollectHistory;
 
     std::vector<U16> mHistory;
+
+    const size_t kInvalidHistoryIndex = std::numeric_limits<decltype(mNextHistoryReadIndex)>::max();
 };
 
 #endif // CBITSTREAMDECODER_H
