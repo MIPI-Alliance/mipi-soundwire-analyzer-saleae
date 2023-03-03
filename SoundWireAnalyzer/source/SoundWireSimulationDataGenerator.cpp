@@ -88,8 +88,8 @@ U32 SoundWireSimulationDataGenerator::GenerateSimulationData(U64 largest_sample_
 
 void SoundWireSimulationDataGenerator::CreateFrame()
 {
-    const U32 numRows = mSettings->mNumRows;
-    const U32 numCols = mSettings->mNumCols;
+    const U32 numRows = mSettings->mNumRows ? mSettings->mNumRows : 48;
+    const U32 numCols = mSettings->mNumCols ? mSettings->mNumCols : 4;
     U32 nextPAR;
     U64 command = 0;
 
