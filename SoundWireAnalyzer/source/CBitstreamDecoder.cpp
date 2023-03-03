@@ -18,6 +18,7 @@
 
 #include "CBitstreamDecoder.h"
 #include "CDynamicSyncGenerator.h"
+#include "SoundWireAnalyzer.h"
 #include "SoundWireProtocolDefs.h"
 
 // Reduce size of history buffer by storing the delta between sample numbers.
@@ -39,16 +40,17 @@ static const unsigned int kHistoryBitHighFlag   = 0x8000;
 
 CBitstreamDecoder::CMark::CMark(const CBitstreamDecoder& decoder, size_t nextHistoryReadIndex)
     : mLastDataLevel(decoder.mLastDataLevel),
-      mContiguousOnesCount(decoder.mContiguousOnesCount),
       mParityIsOdd(decoder.mParityIsOdd),
       mCurrentSampleNumber(decoder.mCurrentSampleNumber),
       mNextHistoryReadIndex(nextHistoryReadIndex)
 {
 }
 
-CBitstreamDecoder::CBitstreamDecoder(AnalyzerChannelData* clock,
+CBitstreamDecoder::CBitstreamDecoder(SoundWireAnalyzer& analyzer,
+                                     AnalyzerChannelData* clock,
                                      AnalyzerChannelData* data)
-    : mClock(clock),
+    : mAnalyzer(analyzer),
+      mClock(clock),
       mData(data),
       mCurrentSampleNumber(0),
       mContiguousOnesCount(0),
@@ -141,6 +143,26 @@ bool CBitstreamDecoder::NextBitValue()
         }
 
         mCurrentSampleNumber = sampleNum;
+
+        // A run of 4096 data line toggles is a bus reset
+        if (level != mLastDataLevel) {
+            switch (mContiguousOnesCount) {
+            case 0:
+                mContiguousOnesStartSample = mCurrentSampleNumber;
+                ++mContiguousOnesCount;
+                break;
+            case 4095:
+                // Seen 4095 already so this is the 4096th and final
+                mAnalyzer.NotifyBusReset(mContiguousOnesStartSample, mCurrentSampleNumber);
+                mContiguousOnesCount = 0;
+                break;
+            default:
+                ++mContiguousOnesCount;
+                break;
+            }
+        } else {
+            mContiguousOnesCount = 0;
+        }
     }
 
     // NRZ signals a 1 by a change of level, 0 by no change.
@@ -150,13 +172,6 @@ bool CBitstreamDecoder::NextBitValue()
     // Parity counts the number of high levels (not the number of decoded ones).
     if (level == BIT_HIGH) {
         mParityIsOdd = !mParityIsOdd;
-    }
-
-    // Bus reset counts a run of decoded ones
-    if (decodedBitValue) {
-        ++mContiguousOnesCount;
-    } else {
-        mContiguousOnesCount = 0;
     }
 
     return decodedBitValue;
@@ -223,7 +238,6 @@ CBitstreamDecoder::CMark CBitstreamDecoder::Mark() const
 void CBitstreamDecoder::SetToMark(const CMark& mark)
 {
     mLastDataLevel = mark.mLastDataLevel;
-    mContiguousOnesCount = mark.mContiguousOnesCount;
     mParityIsOdd = mark.mParityIsOdd;
     mCurrentSampleNumber = mark.mCurrentSampleNumber;
     mNextHistoryReadIndex = mark.mNextHistoryReadIndex;

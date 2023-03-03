@@ -16,10 +16,12 @@
 #ifndef SOUNDWIRE_ANALYZER_RESULTS_H
 #define SOUNDWIRE_ANALYZER_RESULTS_H
 
+#include <string>
 #include <AnalyzerResults.h>
 
 class SoundWireAnalyzer;
 class SoundWireAnalyzerSettings;
+class Frame;
 
 class SoundWireAnalyzerResults : public AnalyzerResults
 {
@@ -27,6 +29,11 @@ public:
     // Used in mFlags field of frame.
     static const int kFlagParityBad = (1 << 0);
     static const int kFlagSyncLoss = (1 << 1);
+
+    enum TBubbleType {
+        EBubbleNormal = 0,
+        EBubbleBusReset
+    };
 
 public:
     SoundWireAnalyzerResults(SoundWireAnalyzer* analyzer, SoundWireAnalyzerSettings* settings);
@@ -44,6 +51,7 @@ public:
 private:
     void generateClockBubble(U64 frame_index);
     void generateDataBubble(U64 frame_index);
+    void exportNormalFrame(const Frame& frame, std::vector<std::string>& strings);
 
 protected:
     SoundWireAnalyzerSettings* mSettings;

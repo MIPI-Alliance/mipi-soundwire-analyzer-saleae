@@ -21,6 +21,8 @@
 #include <AnalyzerChannelData.h>
 #include <LogicPublicTypes.h>
 
+class SoundWireAnalyzer;
+
 class CBitstreamDecoder
 {
 public:
@@ -37,13 +39,12 @@ public:
 
         enum BitState mLastDataLevel;
         bool mParityIsOdd;
-        unsigned int mContiguousOnesCount;
         size_t mNextHistoryReadIndex;
         U64 mCurrentSampleNumber;
     };
 
 public:
-    CBitstreamDecoder(AnalyzerChannelData* clock, AnalyzerChannelData* data);
+    CBitstreamDecoder(SoundWireAnalyzer& analyzer, AnalyzerChannelData* clock, AnalyzerChannelData* data);
     ~CBitstreamDecoder();
 
     bool NextBitValue();
@@ -74,9 +75,11 @@ private:
 private:
     friend class CMark;
 
+    SoundWireAnalyzer& mAnalyzer;
     AnalyzerChannelData* mClock;
     AnalyzerChannelData* mData;
     U64 mCurrentSampleNumber;
+    U64 mContiguousOnesStartSample;
     unsigned int mContiguousOnesCount;
     bool mParityIsOdd;
     enum BitState mLastDataLevel;

@@ -171,13 +171,25 @@ void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const
     mResults->AddFrameV2(f, type, startSample, fv1.mEndingSampleInclusive);
 }
 
+void SoundWireAnalyzer::NotifyBusReset(U64 startSampleNumber, U64 endSampleNumber)
+{
+    Frame f1;
+    f1.mStartingSampleInclusive = startSampleNumber;
+    f1.mEndingSampleInclusive = endSampleNumber;
+    f1.mType = SoundWireAnalyzerResults::EBubbleBusReset;
+    mResults->AddFrame(f1);
+
+    FrameV2 f2;
+    mResults->AddFrameV2(f2, "BUS RESET", startSampleNumber, endSampleNumber);
+}
+
 void SoundWireAnalyzer::WorkerThread()
 {
     mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
     mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
     const bool suppressDuplicatePings = mSettings->mSuppressDuplicatePings;
 
-    mDecoder.reset(new CBitstreamDecoder(mSoundWireClock, mSoundWireData));
+    mDecoder.reset(new CBitstreamDecoder(*this, mSoundWireClock, mSoundWireData));
 
     // Advance one bit to get an initial data line state
     mDecoder->NextBitValue();
@@ -242,7 +254,7 @@ void SoundWireAnalyzer::WorkerThread()
         case CFrameReader::eFrameComplete:
             f.mEndingSampleInclusive = sampleNumber;
             f.mData1 = frameReader.ControlWord().Value();
-            f.mType = 0;
+            f.mType = SoundWireAnalyzerResults::EBubbleNormal;
             f.mFlags = 0;
 
             // Seed dynamic sequence from value in first frame
