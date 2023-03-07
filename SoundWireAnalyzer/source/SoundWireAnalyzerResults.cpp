@@ -66,6 +66,9 @@ void SoundWireAnalyzerResults::generateClockBubble(U64 frame_index)
     case EBubbleBusReset:
         AddResultString("BUS RESET");
         break;
+
+    default:
+        return;
     }
 }
 
@@ -233,6 +236,13 @@ void SoundWireAnalyzerResults::GenerateExportFile(const char* fileName,
             strings.push_back(""); // skip control word column
             strings.push_back("BUS RESET");
             break;
+        case EBubbleFrameShape:
+            {
+            strings.push_back(""); // skip control word column
+            std::ostringstream ss;
+            ss << "shape " << (U16)frame.mData1 << " x " << (U16)frame.mData2;
+            strings.push_back(ss.str());
+            }
         default:
             break;
         }

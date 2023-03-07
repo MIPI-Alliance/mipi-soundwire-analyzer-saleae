@@ -32,7 +32,8 @@ public:
 
     enum TBubbleType {
         EBubbleNormal = 0,
-        EBubbleBusReset
+        EBubbleBusReset,
+        EBubbleFrameShape,
     };
 
 public:

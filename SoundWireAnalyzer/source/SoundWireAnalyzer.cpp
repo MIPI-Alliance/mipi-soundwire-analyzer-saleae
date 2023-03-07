@@ -81,6 +81,15 @@ void SoundWireAnalyzer::addFrameShapeMessage(U64 sampleNumber, int rows, int col
     }
 
     mResults->AddFrameV2(f, shapeType.str().c_str(), sampleNumber, sampleNumber);
+
+    Frame f1;
+    f1.mStartingSampleInclusive = sampleNumber;
+    f1.mEndingSampleInclusive = sampleNumber + 1; // end is not allowed to be same as start
+    f1.mType = SoundWireAnalyzerResults::EBubbleFrameShape;
+    f1.mData1 = rows;
+    f1.mData2 = columns;
+    mResults->AddFrame(f1);
+
 }
 
 void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1)
