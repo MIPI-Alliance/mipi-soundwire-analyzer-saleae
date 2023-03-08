@@ -19,8 +19,41 @@
 #include <LogicPublicTypes.h>
 #include "SoundWireProtocolDefs.h"
 
+#define _SHIFT(firstRow, numRows) (kCtrlWordLastRow - (firstRow) - (numRows) + 1)
+#define _MASK(firstRow, numRows) (((1ULL << (numRows)) - 1) << _SHIFT(firstRow, numRows))
+
 class CControlWordBuilder
 {
+private:
+    const U64 kCtrlPREQMask         = _MASK(kCtrlPREQRow, 1);
+    const U64 kCtrlOpCodeMask       = _MASK(kCtrlOpCodeRow, kCtrlOpCodeNumRows);
+    const U64 kCtrlOpCodeShift      = _SHIFT(kCtrlOpCodeRow, kCtrlOpCodeNumRows);
+    const U64 kCtrlStaticSyncMask   = _MASK(kCtrlStaticSyncRow, kCtrlStaticSyncNumRows);
+    const U64 kCtrlStaticSyncShift  = _SHIFT(kCtrlStaticSyncRow, kCtrlStaticSyncNumRows);
+    const U64 kCtrlPhySyncMask      = _MASK(kCtrlPhySyncRow, 1);
+    const U64 kCtrlDynamicSyncMask  = _MASK(kCtrlDynamicSyncRow, kCtrlDynamicSyncNumRows);
+    const U64 kCtrlDynamicSyncShift = _SHIFT(kCtrlDynamicSyncRow, kCtrlDynamicSyncNumRows);
+    const U64 kCtrlPARMask          = _MASK(kCtrlPARRow, 1);
+    const U64 kCtrlNAKMask          = _MASK(kCtrlNAKRow, 1);
+    const U64 kCtrlACKMask          = _MASK(kCtrlACKRow, 1);
+
+    // PING command control word rows
+    const U64 kPingSSPMask          = _MASK(kPingSSPRow, 1);
+    const U64 kPingBREQMask         = _MASK(kPingBREQRow, 1);
+    const U64 kPingBRELMask         = _MASK(kPingBRELRow, 1);
+    const U64 kPingStat4_11Mask     = _MASK(kPingStat4_11Row, kPingStat4_11NumRows);
+    const U64 kPingStat4_11Shift    = _SHIFT(kPingStat4_11Row, kPingStat4_11NumRows);
+    const U64 kPingStat0_3Mask      = _MASK(kPingStat0_3Row, kPingStat0_3NumRows);
+    const U64 kPingStat0_3Shift     = _SHIFT(kPingStat0_3Row, kPingStat0_3NumRows);
+
+    // Read/Write command controls word rows
+    const U64 kDevAddrMask          = _MASK(kDevAddrRow, kDevAddrNumRows);
+    const U64 kDevAddrShift         = _SHIFT(kDevAddrRow, kDevAddrNumRows);
+    const U64 kRegAddrMask          = _MASK(kRegAddrRow, kRegAddrNumRows);
+    const U64 kRegAddrShift         = _SHIFT(kRegAddrRow, kRegAddrNumRows);
+    const U64 kRegDataMask          = _MASK(kRegDataRow, kRegDataNumRows);
+    const U64 kRegDataShift         = _SHIFT(kRegDataRow, kRegDataNumRows);
+
 public:
     CControlWordBuilder();
 
@@ -28,54 +61,37 @@ public:
     void PushBit(bool isOne);
     void SkipBits(int numBits);
 
-    inline void SetValue(const U64 value)
-        { mWord = value; }
+    inline void SetValue(const U64 value) { mValue = value; }
 
-    inline U64 Value() const
-        { return mWord; }
+	inline U64 Value() const { return mValue; }
+	inline bool Preq() const { return mValue & kCtrlPREQMask; }
+	inline bool Par() const { return mValue & kCtrlPARMask; }
+	inline bool Nak() const { return mValue & kCtrlNAKMask; }
+	inline bool Ack() const { return mValue & kCtrlACKMask; }
+	inline SdwOpCode OpCode() const
+		{ return static_cast<SdwOpCode>((mValue & kCtrlOpCodeMask) >> kCtrlOpCodeShift); }
+	inline unsigned int StaticSync() const
+        { return static_cast<unsigned int>((mValue & kCtrlStaticSyncMask) >> kCtrlStaticSyncShift); }
+	inline unsigned int DynamicSync() const
+        { return static_cast<unsigned int>((mValue & kCtrlDynamicSyncMask) >> kCtrlDynamicSyncShift); }
 
-    inline unsigned int PeekField(int firstRow, int numRows) const
-        {
-            U64 mask = (1ULL << numRows) - 1;
-            int shift = kCtrlWordLastRow - firstRow - numRows + 1;
-            return (mWord >> shift) & mask;
-        }
+	// PING words
+	inline bool Ssp() const { return mValue & kPingSSPMask; }
+	inline unsigned int PeripheralStat() const
+	{
+		return static_cast<unsigned int>(
+            (((mValue & kPingStat4_11Mask) >> kPingStat4_11Shift) << 8)
+			| ((mValue & kPingStat0_3Mask) >> kPingStat0_3Shift)
+        );
+	}
 
-    inline bool PeekBit(int row) const
-        {
-            return mWord & (1ULL << (kCtrlWordLastRow - row));
-        }
-
-    inline bool Preq() const
-        { return PeekBit(kCtrlPREQRow); }
-
-    inline bool Par() const
-        { return PeekBit(kCtrlPARRow); }
-
-    inline bool Nak() const
-        { return PeekBit(kCtrlNAKRow); }
-
-    inline bool Ack() const
-        { return PeekBit(kCtrlACKRow); }
-
-    inline SdwOpCode OpCode() const
-        { return static_cast<SdwOpCode>(PeekField(kCtrlOpCodeRow, kCtrlOpCodeNumRows)); }
-
-    inline unsigned int StaticSync() const
-        { return PeekField(kCtrlStaticSyncRow, kCtrlStaticSyncNumRows); }
-
-    inline unsigned int DynamicSync() const
-        { return PeekField(kCtrlDynamicSyncRow, kCtrlDynamicSyncNumRows); }
-
-    // PING words
-    inline bool Ssp() const
-        { return PeekBit(kPingSSPRow); }
-
-    inline unsigned int PeripheralStat() const
-        {
-            return (PeekField(kPingStat4_11Row, kPingStat4_11NumRows) << 8) |
-                    PeekField(kPingStat0_3Row, kPingStat0_3NumRows);
-        }
+	// Read/Write words
+	inline unsigned int DeviceAddress() const
+        { return static_cast<unsigned int>((mValue & kDevAddrMask) >> kDevAddrShift); }
+	inline unsigned int RegisterAddress() const
+        { return static_cast<unsigned int>((mValue & kRegAddrMask) >> kRegAddrShift); }
+	inline unsigned int DataValue() const
+        { return static_cast<unsigned int>((mValue & kRegDataMask) >> kRegDataShift); }
 
     inline bool IsPingSameAs(const CControlWordBuilder& other) const
         {
@@ -85,16 +101,6 @@ public:
                     (Ack() == other.Ack()) &&
                     (Nak() == other.Nak());
         }
-
-    // Read/Write words
-    inline unsigned int DeviceAddress() const
-        { return PeekField(kDevAddrRow, kDevAddrNumRows); }
-
-    inline unsigned int RegisterAddress() const
-        { return PeekField(kRegAddrRow, kRegAddrNumRows); }
-
-    inline unsigned int DataValue() const
-        { return PeekField(kRegDataRow, kRegDataNumRows); }
 
     inline bool IsFrameShapeChange() const
         {
@@ -108,7 +114,7 @@ public:
     void GetNewShape(int& rows, int& columns) const;
 
 private:
-    U64 mWord;
+    U64 mValue;
     U64 mNextPushBitMask;
 };
 

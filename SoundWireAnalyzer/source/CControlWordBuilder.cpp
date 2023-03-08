@@ -16,14 +16,14 @@
 #include "CControlWordBuilder.h"
 
 CControlWordBuilder::CControlWordBuilder()
-    : mWord(0),
+    : mValue(0),
       mNextPushBitMask(1ULL << kCtrlWordLastRow)
 {
 }
 
 void CControlWordBuilder::Reset()
 {
-    mWord = 0;
+    mValue = 0;
     mNextPushBitMask = 1ULL << kCtrlWordLastRow;
 }
 
@@ -33,7 +33,7 @@ void CControlWordBuilder::PushBit(bool isOne)
     // position in the word rather than shifting, so that fields can immediately
     // be read from a partially-constructed word.
     if (isOne) {
-        mWord |= mNextPushBitMask;
+        mValue |= mNextPushBitMask;
     }
 
     mNextPushBitMask >>= 1;
