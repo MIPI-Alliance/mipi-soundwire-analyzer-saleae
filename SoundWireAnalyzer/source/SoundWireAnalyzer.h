@@ -54,6 +54,9 @@ private:
     AnalyzerChannelData* mSoundWireData;
 
     std::unique_ptr<CBitstreamDecoder> mDecoder;
+
+    bool mAddBubbleFrames;
+
     std::unique_ptr<SoundWireSimulationDataGenerator> mSimulationDataGenerator;
 };
 

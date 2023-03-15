@@ -82,14 +82,15 @@ void SoundWireAnalyzer::addFrameShapeMessage(U64 sampleNumber, int rows, int col
 
     mResults->AddFrameV2(f, shapeType.str().c_str(), sampleNumber, sampleNumber);
 
-    Frame f1;
-    f1.mStartingSampleInclusive = sampleNumber;
-    f1.mEndingSampleInclusive = sampleNumber + 1; // end is not allowed to be same as start
-    f1.mType = SoundWireAnalyzerResults::EBubbleFrameShape;
-    f1.mData1 = rows;
-    f1.mData2 = columns;
-    mResults->AddFrame(f1);
-
+    if (mAddBubbleFrames) {
+        Frame f1;
+        f1.mStartingSampleInclusive = sampleNumber;
+        f1.mEndingSampleInclusive = sampleNumber + 1; // end is not allowed to be same as start
+        f1.mType = SoundWireAnalyzerResults::EBubbleFrameShape;
+        f1.mData1 = rows;
+        f1.mData2 = columns;
+        mResults->AddFrame(f1);
+    }
 }
 
 void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1)
@@ -182,11 +183,13 @@ void SoundWireAnalyzer::addFrameV2(const CControlWordBuilder& controlWord, const
 
 void SoundWireAnalyzer::NotifyBusReset(U64 startSampleNumber, U64 endSampleNumber)
 {
-    Frame f1;
-    f1.mStartingSampleInclusive = startSampleNumber;
-    f1.mEndingSampleInclusive = endSampleNumber;
-    f1.mType = SoundWireAnalyzerResults::EBubbleBusReset;
-    mResults->AddFrame(f1);
+    if (mAddBubbleFrames) {
+        Frame f1;
+        f1.mStartingSampleInclusive = startSampleNumber;
+        f1.mEndingSampleInclusive = endSampleNumber;
+        f1.mType = SoundWireAnalyzerResults::EBubbleBusReset;
+        mResults->AddFrame(f1);
+    }
 
     FrameV2 f2;
     mResults->AddFrameV2(f2, "BUS RESET", startSampleNumber, endSampleNumber);
@@ -197,6 +200,9 @@ void SoundWireAnalyzer::WorkerThread()
     mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
     mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
     const bool suppressDuplicatePings = mSettings->mSuppressDuplicatePings;
+    const bool annotateBitValues = mSettings->mAnnotateBitValues;
+    const bool annotateFrameStarts = mSettings->mAnnotateFrameStarts;
+    mAddBubbleFrames = mSettings->mAnnotateTrace;
 
     mDecoder.reset(new CBitstreamDecoder(*this, mSoundWireClock, mSoundWireData));
 
@@ -239,9 +245,11 @@ void SoundWireAnalyzer::WorkerThread()
 
         // TODO: If we lost sync we will revisit some bits but must not add the
         // marker again
-        mResults->AddMarker(sampleNumber,
-                            bitValue ? AnalyzerResults::One : AnalyzerResults::Zero,
-                            mSettings->mInputChannelData);
+        if (annotateBitValues) {
+            mResults->AddMarker(sampleNumber,
+                                bitValue ? AnalyzerResults::One : AnalyzerResults::Zero,
+                                mSettings->mInputChannelData);
+        }
 
         switch (frameReader.PushBit(bitValue)) {
         case CFrameReader::eFrameStart:
@@ -250,9 +258,11 @@ void SoundWireAnalyzer::WorkerThread()
             // Mark start of frame with a green dot on the clock
             // TODO: If we lost sync we will revisit some bits but must not
             // add the marker again
-            mResults->AddMarker(sampleNumber,
-                                AnalyzerResults::Start,
-                                mSettings->mInputChannelClock);
+            if (annotateFrameStarts) {
+                mResults->AddMarker(sampleNumber,
+                                    AnalyzerResults::Start,
+                                    mSettings->mInputChannelClock);
+            }
             break;
         case CFrameReader::eNeedMoreBits:
             break;
@@ -285,13 +295,17 @@ void SoundWireAnalyzer::WorkerThread()
                     (frameReader.ControlWord().DynamicSync() != dynamicSync.Next())) {
                     inSync = false;
                     f.mFlags |= SoundWireAnalyzerResults::kFlagSyncLoss;
-                    mResults->AddFrame(f);
+                    if (mAddBubbleFrames) {
+                        mResults->AddFrame(f);
+                    }
                     addFrameV2(frameReader.ControlWord(), f);
                     break;
                 }
             }
 
-            mResults->AddFrame(f);
+            if (mAddBubbleFrames) {
+                mResults->AddFrame(f);
+            }
 
             if (suppressDuplicatePings &&
                 (frameReader.ControlWord().OpCode() == kOpPing)) {

@@ -25,7 +25,10 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
         mInputChannelData(UNDEFINED_CHANNEL),
         mNumRows(48),
         mNumCols(2),
-        mSuppressDuplicatePings(false)
+        mSuppressDuplicatePings(false),
+        mAnnotateBitValues(false),
+        mAnnotateFrameStarts(false),
+        mAnnotateTrace(true)
 {
     mInputChannelInterfaceClock.reset( new AnalyzerSettingInterfaceChannel() );
     mInputChannelInterfaceClock->SetTitleAndTooltip("SoundWire Clock", "SoundWire Clock");
@@ -69,11 +72,26 @@ SoundWireAnalyzerSettings::SoundWireAnalyzerSettings()
     mSuppressDuplicatePingsInterface->SetCheckBoxText("Suppress duplicate pings in table");
     mSuppressDuplicatePingsInterface->SetValue(mSuppressDuplicatePings);
 
+    mAnnotateBitValuesInterface.reset(new AnalyzerSettingInterfaceBool());
+    mAnnotateBitValuesInterface->SetCheckBoxText("Annotate decoded bit values");
+    mAnnotateBitValuesInterface->SetValue(mAnnotateBitValues);
+
+    mAnnotateFrameStartsInterface.reset(new AnalyzerSettingInterfaceBool());
+    mAnnotateFrameStartsInterface->SetCheckBoxText("Annotate frame starts");
+    mAnnotateFrameStartsInterface->SetValue(mAnnotateFrameStarts);
+
+    mAnnotateTraceInterface.reset(new AnalyzerSettingInterfaceBool());
+    mAnnotateTraceInterface->SetCheckBoxText("Annotate trace");
+    mAnnotateTraceInterface->SetValue(mAnnotateTrace);
+
     AddInterface(mInputChannelInterfaceClock.get());
     AddInterface(mInputChannelInterfaceData.get());
     AddInterface(mRowInterface.get());
     AddInterface(mColInterface.get());
     AddInterface(mSuppressDuplicatePingsInterface.get());
+    AddInterface(mAnnotateBitValuesInterface.get());
+    AddInterface(mAnnotateFrameStartsInterface.get());
+    AddInterface(mAnnotateTraceInterface.get());
 
     ClearChannels();
     AddChannel(mInputChannelClock, "SoundWire Clock", false);
@@ -97,6 +115,9 @@ bool SoundWireAnalyzerSettings::SetSettingsFromInterfaces()
     mNumRows = static_cast<unsigned int>(mRowInterface->GetNumber());
     mNumCols = static_cast<unsigned int>(mColInterface->GetNumber());
     mSuppressDuplicatePings = mSuppressDuplicatePingsInterface->GetValue();
+    mAnnotateBitValues = mAnnotateBitValuesInterface->GetValue();
+    mAnnotateFrameStarts = mAnnotateFrameStartsInterface->GetValue();
+    mAnnotateTrace = mAnnotateTraceInterface->GetValue();
 
     ClearChannels();
     AddChannel(mInputChannelClock, "SoundWire Clock", true);
@@ -113,6 +134,9 @@ void SoundWireAnalyzerSettings::UpdateInterfacesFromSettings()
     mRowInterface->SetNumber(mNumRows);
     mColInterface->SetNumber(mNumCols);
     mSuppressDuplicatePingsInterface->SetValue(mSuppressDuplicatePings);
+    mAnnotateBitValuesInterface->SetValue(mAnnotateBitValues);
+    mAnnotateFrameStartsInterface->SetValue(mAnnotateFrameStarts);
+    mAnnotateTraceInterface->SetValue(mAnnotateTrace);
 }
 
 void SoundWireAnalyzerSettings::LoadSettings(const char* settings)
@@ -126,6 +150,9 @@ void SoundWireAnalyzerSettings::LoadSettings(const char* settings)
         text_archive >> mNumRows;
         text_archive >> mNumCols;
         text_archive >> mSuppressDuplicatePings;
+        text_archive >> mAnnotateBitValues;
+        text_archive >> mAnnotateFrameStarts;
+        text_archive >> mAnnotateTrace;
 
         ClearChannels();
         AddChannel(mInputChannelClock, "SoundWire Clock", true);
@@ -145,6 +172,9 @@ const char* SoundWireAnalyzerSettings::SaveSettings()
     text_archive << mNumRows;
     text_archive << mNumCols;
     text_archive << mSuppressDuplicatePings;
+    text_archive << mAnnotateBitValues;
+    text_archive << mAnnotateFrameStarts;
+    text_archive << mAnnotateTrace;
 
     return SetReturnString(text_archive.GetString());
 }

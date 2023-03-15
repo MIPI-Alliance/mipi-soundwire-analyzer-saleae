@@ -43,6 +43,9 @@ public:
     unsigned int mNumRows;
     unsigned int mNumCols;
     bool mSuppressDuplicatePings;
+    bool mAnnotateBitValues;
+    bool mAnnotateFrameStarts;
+    bool mAnnotateTrace;
 
 protected:
     std::unique_ptr<AnalyzerSettingInterfaceChannel> mInputChannelInterfaceClock;
@@ -50,6 +53,9 @@ protected:
     std::unique_ptr<AnalyzerSettingInterfaceNumberList> mRowInterface;
     std::unique_ptr<AnalyzerSettingInterfaceNumberList> mColInterface;
     std::unique_ptr<AnalyzerSettingInterfaceBool> mSuppressDuplicatePingsInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceBool> mAnnotateBitValuesInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceBool> mAnnotateFrameStartsInterface;
+    std::unique_ptr<AnalyzerSettingInterfaceBool> mAnnotateTraceInterface;
 };
 
 #endif //SOUNDWIRE_ANALYZER_SETTINGS_H
