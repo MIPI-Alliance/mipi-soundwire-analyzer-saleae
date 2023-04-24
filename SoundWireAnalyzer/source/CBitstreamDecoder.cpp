@@ -123,6 +123,7 @@ enum BitState CBitstreamDecoder::nextBitFromHistory(U64& sampleDelta)
 bool CBitstreamDecoder::NextBitValue()
 {
     BitState level;
+    bool decodedBitValue;
 
     // We need to be able to go back to past data when trying to find sync
     // but the Saleae APIs can only go forward. If data has been rewound to
@@ -132,11 +133,18 @@ bool CBitstreamDecoder::NextBitValue()
         U64 delta;
         level = nextBitFromHistory(delta);
         mCurrentSampleNumber += delta;
+
+        // NRZ signals a 1 by a change of level, 0 by no change.
+        decodedBitValue = (level != mLastDataLevel);
     } else {
         mClock->AdvanceToNextEdge();
         U64 sampleNum = mClock->GetSampleNumber();
         mData->AdvanceToAbsPosition(sampleNum);
         level = mData->GetBitState();
+        decodedBitValue = (level != mLastDataLevel);
+
+        // Bit annotations are only added when a new bit is read from the channel.
+        mAnalyzer.AnnotateBitValue(sampleNum, decodedBitValue);
 
         if (mCollectHistory) {
             appendBitToHistory(level, sampleNum - mCurrentSampleNumber);
@@ -165,8 +173,6 @@ bool CBitstreamDecoder::NextBitValue()
         }
     }
 
-    // NRZ signals a 1 by a change of level, 0 by no change.
-    bool decodedBitValue = (level != mLastDataLevel);
     mLastDataLevel = level;
 
     // Parity counts the number of high levels (not the number of decoded ones).

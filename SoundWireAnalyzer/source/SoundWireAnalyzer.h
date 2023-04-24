@@ -43,6 +43,15 @@ public:
 
     void NotifyBusReset(U64 startSampleNumber, U64 endSampleNumber);
 
+    inline void AnnotateBitValue(U64 sampleNumber, bool value)
+    {
+            if (mAnnotateBitValues) {
+                mResults->AddMarker(sampleNumber,
+                                    value ? AnalyzerResults::One : AnalyzerResults::Zero,
+                                    mInputChannelData);
+            }
+    }
+
 private:
     void addFrameShapeMessage(U64 sampleNumber, int rows, int columns);
     void addFrameV2(const CControlWordBuilder& controlWord, const Frame& fv1);
@@ -50,12 +59,15 @@ private:
 private:
     std::unique_ptr<SoundWireAnalyzerSettings> mSettings;
     std::unique_ptr<SoundWireAnalyzerResults> mResults;
+    Channel mInputChannelClock;
+    Channel mInputChannelData;
     AnalyzerChannelData* mSoundWireClock;
     AnalyzerChannelData* mSoundWireData;
 
     std::unique_ptr<CBitstreamDecoder> mDecoder;
 
     bool mAddBubbleFrames;
+    bool mAnnotateBitValues;
 
     std::unique_ptr<SoundWireSimulationDataGenerator> mSimulationDataGenerator;
 };

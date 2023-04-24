@@ -27,7 +27,10 @@
 
 SoundWireAnalyzer::SoundWireAnalyzer()
   :     Analyzer2(),
-        mSettings(new SoundWireAnalyzerSettings())
+        mSettings(new SoundWireAnalyzerSettings()),
+        mAddBubbleFrames(false),
+        mAnnotateBitValues(false)
+
 {
     SetAnalyzerSettings(mSettings.get());
     UseFrameV2();
@@ -197,12 +200,14 @@ void SoundWireAnalyzer::NotifyBusReset(U64 startSampleNumber, U64 endSampleNumbe
 
 void SoundWireAnalyzer::WorkerThread()
 {
-    mSoundWireClock = GetAnalyzerChannelData(mSettings->mInputChannelClock);
-    mSoundWireData = GetAnalyzerChannelData(mSettings->mInputChannelData);
+    mInputChannelClock = mSettings->mInputChannelClock;
+    mInputChannelData = mSettings->mInputChannelData;
+    mSoundWireClock = GetAnalyzerChannelData(mInputChannelClock);
+    mSoundWireData = GetAnalyzerChannelData(mInputChannelData);
     const bool suppressDuplicatePings = mSettings->mSuppressDuplicatePings;
-    const bool annotateBitValues = mSettings->mAnnotateBitValues;
     const bool annotateFrameStarts = mSettings->mAnnotateFrameStarts;
     mAddBubbleFrames = mSettings->mAnnotateTrace;
+    mAnnotateBitValues = mSettings->mAnnotateBitValues;
 
     mDecoder.reset(new CBitstreamDecoder(*this, mSoundWireClock, mSoundWireData));
 
@@ -242,14 +247,6 @@ void SoundWireAnalyzer::WorkerThread()
 
         bool bitValue = mDecoder->NextBitValue();
         U64 sampleNumber = mDecoder->CurrentSampleNumber();
-
-        // TODO: If we lost sync we will revisit some bits but must not add the
-        // marker again
-        if (annotateBitValues) {
-            mResults->AddMarker(sampleNumber,
-                                bitValue ? AnalyzerResults::One : AnalyzerResults::Zero,
-                                mSettings->mInputChannelData);
-        }
 
         switch (frameReader.PushBit(bitValue)) {
         case CFrameReader::eFrameStart:
