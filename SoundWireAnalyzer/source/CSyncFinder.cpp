@@ -25,6 +25,9 @@
 // Row number of last bit in static sync word
 static const int kLastStaticSyncRow = kCtrlStaticSyncRow + kCtrlStaticSyncNumRows - 1;
 
+// Sliding search window width
+static const int kSearchWindowBits = 4096;
+
 // The 8 static sync bits are in column 0. The maximum number of columns is
 // 16 so a full static sync word cannot cover more than 8 * 16 = 128 bits.
 class CStaticSyncMatcher
@@ -257,13 +260,13 @@ void CSyncFinder::FindSync(int rows, int columns)
             matcher.Reset(itCols);
             U64 matchedBitOffset = 0;
 
-            // Limit the static sync word search to the equivalent of 2 frames
-            // before trying another column count.
+            // Limit the static sync word search to the the search window plus
+            // one frame before trying another column count.
             // This prevents having to scan all the way to the end of the data
             // capture before trying another column count, or failing to detect
-            // the first possble sync because the current column count matches
+            // the first possible sync because the current column count matches
             // a sync later in the capture.
-            U64 maxStaticSyncSearchBits = 2 * itCols * kMaxRows;
+            U64 maxStaticSyncSearchBits = kSearchWindowBits + TotalBitsInFrame(kMaxRows, itCols);
             for (; matchedBitOffset < maxStaticSyncSearchBits; ++matchedBitOffset) {
                 bool foundStaticSync = matcher.PushBit(mBitstream.NextBitValue());
                 if (foundStaticSync) {
@@ -277,10 +280,10 @@ void CSyncFinder::FindSync(int rows, int columns)
             mBitstream.SetToMark(syncSearchStartMark);
         }
 
-        // No column count matched, wind on by smallest frame size and try again.
+        // No column count matched, wind on to next search window and try again.
         // A static sync could straddle the end of the chunk we searched so
         // don't skip the entire chunk.
-        mBitstream.SkipBits(TotalBitsInFrame(48, 2));
+        mBitstream.SkipBits(kSearchWindowBits);
         mAnalyzer.CheckIfThreadShouldExit();
     }
 }
