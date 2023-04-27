@@ -139,7 +139,18 @@ bool CBitstreamDecoder::NextBitValue()
     } else {
         mClock->AdvanceToNextEdge();
         U64 sampleNum = mClock->GetSampleNumber();
-        mData->AdvanceToAbsPosition(sampleNum);
+
+        // In the SoundWire spec there is a very narrow window around clock edges
+        // for when the data line is allowed to change. Data is allowed to change
+        // state within 4ns of the clock edge, which is 2 samples at 500MS/s. This
+        // can lead to the next data edge collapsing into the sample containing
+        // the clock edge of the previous data state, thus giving the wrong value
+        // for the data line at that clock edge.
+        // As the data line can start to change within 4ns of the clock edge there
+        // is usually a larger window before the clock edge where the data line
+        // is stable at the correct state. So take the data value from the sample
+        // before the clock edge.
+        mData->AdvanceToAbsPosition(sampleNum - 1);
         level = mData->GetBitState();
         decodedBitValue = (level != mLastDataLevel);
 
