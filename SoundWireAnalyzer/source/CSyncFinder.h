@@ -36,16 +36,16 @@ public:
 
 private:
     int checkSync(int rows, int columns);
-    bool testIfSyncIsReal(const std::vector<int>* rowsList, int columns,
-                          U64 matchedBitOffset, const CBitstreamDecoder::CMark& searchStartMark);
+    bool testIfSyncIsReal(int columns, U64 matchedBitOffset,
+                          const CBitstreamDecoder::CMark& baseMark);
 
 private:
     SoundWireAnalyzer& mAnalyzer;
     CBitstreamDecoder& mBitstream;
     int mRows;
     int mColumns;
+    const std::vector<int>* mRowsList;
     std::vector<int> mSingleRowList;
-    std::vector<int> mSingleColumnList;
 };
 
 #endif // CSYNCFINDER_H

@@ -25,30 +25,36 @@
 // Row number of last bit in static sync word
 static const int kLastStaticSyncRow = kCtrlStaticSyncRow + kCtrlStaticSyncNumRows - 1;
 
-// Sliding search window width
-static const int kSearchWindowBits = 4096;
-
 // The 8 static sync bits are in column 0. The maximum number of columns is
 // 16 so a full static sync word cannot cover more than 8 * 16 = 128 bits.
 class CStaticSyncMatcher
 {
 public:
-    void Reset(int columns);
-    bool PushBit(bool isOne);
+    CStaticSyncMatcher(int columns);
+
+    int PushBit(bool isOne);
 
 private:
-    enum {
-        kHigh = 0,
-        kLow  = 1
-    };
-    std::array<U64, 2> mAccumulator;
-    std::array<U64, 2> mMask;
-    std::array<U64, 2> mMatch;
+    CStaticSyncMatcher();   // don't allow
+    bool checkPattern(int columns) const;
+
+private:
+    U64 mAccumulatorL;
+    U64 mAccumulatorH;
+    const int mColumns;
 };
 
-void CStaticSyncMatcher::Reset(int columns)
+CStaticSyncMatcher::CStaticSyncMatcher(int columns)
+    : mAccumulatorL(0),
+      mAccumulatorH(0),
+      mColumns(columns)
 {
-    mAccumulator.fill(0);
+}
+
+bool CStaticSyncMatcher::checkPattern(int columns) const
+{
+    U64 maskH, maskL;
+    U64 matchH, matchL;
 
     // Create sync bits match and mask as they will appear in the bitstream.
     // For example if there are 4 columns the 8 sync bits will be at every 4th
@@ -56,71 +62,74 @@ void CStaticSyncMatcher::Reset(int columns)
     // mMask is the mask of bits that we need to check and mMatch is the
     // static sync pattern spread out over those bits.
     switch (columns) {
-                // High                   Low
     case 2:
-        mMask =  { 0x0000000000000000ULL, 0x0000000000005555ULL };
-        mMatch = { 0x0000000000000000ULL, 0x0000000000004501ULL };
+        maskH = 0x0000000000000000ULL;  maskL =  0x0000000000005555ULL;
+        matchH = 0x0000000000000000ULL; matchL = 0x0000000000004501ULL;
         break;
     case 4:
-        mMask =  { 0x0000000000000000ULL, 0x0000000011111111ULL };
-        mMatch = { 0x0000000000000000ULL, 0x0000000010110001ULL };
+        maskH =  0x0000000000000000ULL; maskL =  0x0000000011111111ULL;
+        matchH = 0x0000000000000000ULL; matchL = 0x0000000010110001ULL;
         break;
     case 6:
-        mMask =  { 0x0000000000000000ULL, 0x0000041041041041ULL };
-        mMatch = { 0x0000000000000000ULL, 0x0000040041000001ULL };
+        maskH =  0x0000000000000000ULL; maskL =  0x0000041041041041ULL;
+        matchH = 0x0000000000000000ULL; matchL = 0x0000040041000001ULL;
         break;
     case 8:
-        mMask =  { 0x0000000000000000ULL, 0x0101010101010101ULL };
-        mMatch = { 0x0000000000000000ULL, 0x0100010100000001ULL };
+        maskH =  0x0000000000000000ULL; maskL =  0x0101010101010101ULL;
+        matchH = 0x0000000000000000ULL; matchL = 0x0100010100000001ULL;
         break;
     case 10:
-        mMask =  { 0x0000000000000040ULL, 0x1004010040100401ULL };
-        mMatch = { 0x0000000000000040ULL, 0x0004010000000001ULL };
+        maskH =  0x0000000000000040ULL; maskL =  0x1004010040100401ULL;
+        matchH = 0x0000000000000040ULL; matchL = 0x0004010000000001ULL;
         break;
     case 12:
-        mMask =  { 0x0000000000100100ULL, 0x1001001001001001ULL };
-        mMatch = { 0x0000000000100000ULL, 0x1001000000000001ULL };
+        maskH =  0x0000000000100100ULL; maskL =  0x1001001001001001ULL;
+        matchH = 0x0000000000100000ULL; matchL = 0x1001000000000001ULL;
         break;
     case 14:
-        mMask =  { 0x0000000400100040ULL, 0x0100040010004001ULL };
-        mMatch = { 0x0000000400000040ULL, 0x0100000000000001ULL };
+        maskH =  0x0000000400100040ULL; maskL =  0x0100040010004001ULL;
+        matchH = 0x0000000400000040ULL; matchL = 0x0100000000000001ULL;
         break;
     case 16:
-        mMask =  { 0x0001000100010001ULL, 0x0001000100010001ULL };
-        mMatch = { 0x0001000000010001ULL, 0x0000000000000001ULL };
+        maskH =  0x0001000100010001ULL; maskL =  0x0001000100010001ULL;
+        matchH = 0x0001000000010001ULL; matchL = 0x0000000000000001ULL;
         break;
     default:
         // We should never get here!
-        mMask.fill(0);
-        mMatch.fill(0);
-        break;
+        return false;
     }
-}
 
-bool CStaticSyncMatcher::PushBit(bool isOne)
-{
-    if (mMask[CStaticSyncMatcher::kHigh] == 0) {
-        // Only need 64-bit window to find the match
-        mAccumulator[CStaticSyncMatcher::kLow] <<= 1;
-        mAccumulator[CStaticSyncMatcher::kLow] |= isOne;
-
-        if ((mAccumulator[CStaticSyncMatcher::kLow] & mMask[CStaticSyncMatcher::kLow]) == mMatch[CStaticSyncMatcher::kLow]) {
-            return true;
-        }
-    } else {
-        // Shift 128-bit value left one place
-        mAccumulator[CStaticSyncMatcher::kHigh] <<= 1;
-        mAccumulator[CStaticSyncMatcher::kHigh] |= mAccumulator[CStaticSyncMatcher::kLow] >> 63;
-        mAccumulator[CStaticSyncMatcher::kLow] <<= 1;
-        mAccumulator[CStaticSyncMatcher::kLow] |= isOne;
-
-        if (((mAccumulator[CStaticSyncMatcher::kLow] & mMask[CStaticSyncMatcher::kLow]) == mMatch[CStaticSyncMatcher::kLow]) &&
-            ((mAccumulator[CStaticSyncMatcher::kHigh] & mMask[CStaticSyncMatcher::kHigh]) == mMatch[CStaticSyncMatcher::kHigh])) {
-            return true;
-        }
+    if (((mAccumulatorL & maskL) == matchL) && ((mAccumulatorH & maskH) == matchH)) {
+        return true;
     }
 
     return false;
+}
+
+int CStaticSyncMatcher::PushBit(bool isOne)
+{
+    // Shift 128-bit value left one place
+    mAccumulatorH <<= 1;
+    mAccumulatorH |= (mAccumulatorL >> 63);
+    mAccumulatorL <<= 1;
+    if (isOne) {
+        mAccumulatorL |= 1;
+    }
+
+    if (mColumns > 0) {
+        if (checkPattern(mColumns)) {
+            return mColumns;
+        }
+    } else {
+        // Compare against all possible column counts
+        for (auto itCols : kFrameShapeColumns) {
+            if (checkPattern(itCols)) {
+                return itCols;
+            }
+        }
+    }
+
+    return 0;
 }
 
 CSyncFinder::CSyncFinder(SoundWireAnalyzer& analyzer, CBitstreamDecoder& bitstream)
@@ -195,8 +204,8 @@ int CSyncFinder::checkSync(int rows, int columns)
     return framesOk;
 }
 
-bool CSyncFinder::testIfSyncIsReal(const std::vector<int>* rowsList, const int columns, const U64 matchedBitOffset,
-                                   const CBitstreamDecoder::CMark& searchStartMark)
+bool CSyncFinder::testIfSyncIsReal(const int columns, const U64 matchedBitOffset,
+                                   const CBitstreamDecoder::CMark& baseMark)
 {
     // We're called after the last static sync bit has been read.
     // Calculate how many bits of the frame have already been read.
@@ -205,14 +214,14 @@ bool CSyncFinder::testIfSyncIsReal(const std::vector<int>* rowsList, const int c
     // Save position to restart frame sequence search if this doesn't work out
     const CBitstreamDecoder::CMark seqSearchRestartMark = mBitstream.Mark();
 
-    for (auto itRows : *rowsList) {
+    for (auto itRows : *mRowsList) {
         if (itRows == 0)
             continue;
 
         // Are there enough bits before the static sync word to form a full frame?
         // If not, skip on to where the next frame should start.
         if (matchedBitOffset >= lastStaticSyncBitOffset) {
-            mBitstream.SetToMark(searchStartMark);
+            mBitstream.SetToMark(baseMark);
             mBitstream.SkipBits(matchedBitOffset - lastStaticSyncBitOffset);
         } else {
             mBitstream.SkipBits(TotalBitsInFrame(itRows, columns) - lastStaticSyncBitOffset);
@@ -239,51 +248,31 @@ void CSyncFinder::FindSync(int rows, int columns)
     auto triggerSample = mAnalyzer.GetTriggerSample();
     auto sampleRate = mAnalyzer.GetSampleRate();
 
-    CStaticSyncMatcher matcher;
-    auto *rowsList = &kFrameShapeRows;
-    auto *columnsList = &kFrameShapeColumns;
-
-    if (rows != 0) {
+    if (rows == 0) {
+        mRowsList = &kFrameShapeRows;
+    } else {
         mSingleRowList = { rows };
-        rowsList = &mSingleRowList;
+        mRowsList = &mSingleRowList;
     }
 
-    if (columns != 0) {
-        mSingleColumnList = { columns };
-        columnsList = &mSingleColumnList;
-    }
+    CStaticSyncMatcher matcher(columns);
+    CBitstreamDecoder::CMark baseMark = mBitstream.Mark();
+    U64 bitsFromMark = 0;
 
     for(;;) {
-        CBitstreamDecoder::CMark syncSearchStartMark = mBitstream.Mark();
-
-        for (auto itCols : *columnsList) {
-            matcher.Reset(itCols);
-            U64 matchedBitOffset = 0;
-
-            // Limit the static sync word search to the the search window plus
-            // one frame before trying another column count.
-            // This prevents having to scan all the way to the end of the data
-            // capture before trying another column count, or failing to detect
-            // the first possible sync because the current column count matches
-            // a sync later in the capture.
-            U64 maxStaticSyncSearchBits = kSearchWindowBits + TotalBitsInFrame(kMaxRows, itCols);
-            for (; matchedBitOffset < maxStaticSyncSearchBits; ++matchedBitOffset) {
-                bool foundStaticSync = matcher.PushBit(mBitstream.NextBitValue());
-                if (foundStaticSync) {
-                    if (testIfSyncIsReal(rowsList, itCols, matchedBitOffset, syncSearchStartMark)) {
-                        return;
-                    }
-                }
+        int syncColumns = matcher.PushBit(mBitstream.NextBitValue());
+        if (syncColumns > 0) {
+            if (testIfSyncIsReal(syncColumns, bitsFromMark, baseMark)) {
+                return;
             }
-
-            // Didn't find a sync. Rewind and try a different number of columns
-            mBitstream.SetToMark(syncSearchStartMark);
         }
 
-        // No column count matched, wind on to next search window and try again.
-        // A static sync could straddle the end of the chunk we searched so
-        // don't skip the entire chunk.
-        mBitstream.SkipBits(kSearchWindowBits);
-        mAnalyzer.CheckIfThreadShouldExit();
+        // Limit how many bits we have to wind past from baseMark when seeking
+        // to the start point of a possible frame
+        if (++bitsFromMark > 8192) {
+            baseMark = mBitstream.Mark();
+            bitsFromMark = 0;
+            mAnalyzer.CheckIfThreadShouldExit();
+        }
     }
 }
