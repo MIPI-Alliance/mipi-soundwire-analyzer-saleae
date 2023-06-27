@@ -95,8 +95,9 @@ public:
 
     inline bool IsPingSameAs(const CControlWordBuilder& other) const
         {
+            // True if if the reported status or errors differ.
+            // The SSP flag state is not counted as a difference.
             return (PeripheralStat() == other.PeripheralStat()) &&
-                    (Ssp() == other.Ssp()) &&
                     (Preq() == other.Preq()) &&
                     (Ack() == other.Ack()) &&
                     (Nak() == other.Nak());
